@@ -6,20 +6,9 @@ from watchdog.observers import Observer
 from watchdog.events import LoggingEventHandler
 
 '''
-    for root, subdirectories, files in os.walk(path):
-        # CHECK FOR EMPTY FOLDER
-        for file in files:
-            pathCount = len(path)
-            s.send(len(path))
-            s.send(os.path.join(root, file))'''
-
-'''
     s.connect((destIp, int(destPort)))
 '''
 
-'''
-client1.py 123 321 ~/Desktop/Programming/IntroToNet/dummyFolder 0
-'''
 
 ZERO = 0x00
 NEW = 0x01
@@ -68,28 +57,35 @@ def send_file(file, abs_path, virtual_path):
 def send_folder(abs_path, virtual_path):
     header = make_header(len(virtual_path), 0, virtual_path, _id, NEW)
     send(header)
-    for root, subdirectories, files in os.walk(abs_path):
-        for file_name in files:
+    # Send files
+    for file_name in os.listdir(abs_path):
+        if os.path.isfile(os.path.join(abs_path, file_name)):
+            # for file_name in files:
             f_abs_path = os.path.join(abs_path, file_name)
             f_virtual_path = os.path.join(virtual_path, file_name)
             send_file(file_name, f_abs_path, f_virtual_path)
-        for sub_dir in subdirectories:
-            send_folder(os.path.join(root, sub_dir),
+    # Send sub-folders
+    for sub_dir in os.listdir(abs_path):
+        if not os.path.isfile(os.path.join(abs_path, sub_dir)):
+            # for sub_dir in subdirectories:
+            send_folder(os.path.join(abs_path, sub_dir),
                         os.path.join(virtual_path, sub_dir))
-    pass
 
 
 def send_directory(path: bytes):
-    path_arr = path.split('/')
-    main_folder = path_arr[-1]
-    path_arr.remove(main_folder)
+    main_folder = path.split('/')[-1]
     # Request for creating main folder already done in main()
-    for root, subdirectories, files in os.walk(path):
-        for file_name in files:
+    # Send files
+    for file_name in os.listdir(path):
+        if os.path.isfile(os.path.join(path, file_name)):
+            # for file_name in files:
             f_abs_path = os.path.join(path, file_name)
             f_virtual_path = os.path.join(main_folder, file_name)
             send_file(file_name, f_abs_path, f_virtual_path)
-        for sub_dir in subdirectories:
+    # Send sub-folders
+    for sub_dir in os.listdir(path):
+        if not os.path.isfile(os.path.join(path, sub_dir)):
+            # for sub_dir in subdirectories:
             sd_abs_path = os.path.join(path, sub_dir)
             sd_virtual_path = os.path.join(main_folder, sub_dir)
             send_folder(sd_abs_path, sd_virtual_path)
