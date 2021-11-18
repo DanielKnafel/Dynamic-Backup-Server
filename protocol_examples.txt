@@ -1,1 +1,17 @@
-coming soon 18/11/2021
+->TEST PROCESS
+- create connection with id=0. folder to clone: dummyFolder
+- create new file 123.txt: with 100 time '123'
+- delete 123.txt
+- create new folder f1
+- create new folder f2
+- create new folder f11 in f1
+- create new folder f12 in f1
+- create new file 321.txt in f11: with '321'
+- move 321.txt to f12
+- move f12 from to dummyFolder
+- delete f1
+
+
+->REMINDER:
+header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
+->RESULTS (MESSAGES SENT FROM CLIENT TO SERVER)
