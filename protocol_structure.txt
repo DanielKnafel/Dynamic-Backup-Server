@@ -20,11 +20,14 @@ data_len = 0
 sending:
     send header
 
--> MOV
+-> MOVE:
 cmd = 0x03
 path = where moved from
 data_len = 0
 sending:
-    send header
-    send del_from_path : [path_len (8)] [data (path_len)]
-    send new_to_path : [path_len (8)] [data (path_len)]
+    send header:
+        cmd = MOVF = 0x03
+        path = moved from
+    send where_to:
+        cmd = MOVT = 0x04
+        path = move to
