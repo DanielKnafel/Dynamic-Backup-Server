@@ -1,17 +1,46 @@
 ->TEST PROCESS
-- create connection with id=0. folder to clone: dummyFolder
-- create new file 123.txt: with 100 time '123'
-- delete 123.txt
-- create new folder f1
-- create new folder f2
-- create new folder f11 in f1
-- create new folder f12 in f1
-- create new file 321.txt in f11: with '321'
-- move 321.txt to f12
-- move f12 from to dummyFolder
-- delete f1
+1-  create connection with id=0. folder to clone: dummyFolder
+2-1 - folder already has 123.txt: with 100 time '123'
+2-2 - folder already has folder dummy1
+3-  delete 123.txt
+4-  create new folder f1
+5-  create new folder f2
+6-  create new folder f11 in f1
+7-  create new folder f12 in f1
+8-  create new file 321.txt in f11: with '321'
+9-  move 321.txt to f12
+10- move f12 from to dummyFolder (ctrl+x, ctrl+v)
+11- delete f1
 
 
 ->REMINDER:
 header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
 ->RESULTS (MESSAGES SENT FROM CLIENT TO SERVER)
+1-(id,cmd, path_len=53,data_len=0                    ,path                                                 )
+b'000\x01\x00\x00\x005\x00\x00\x00\x00\x00\x00\x00\x00/home/itay/Desktop/Programming/IntroToNet/dummyFolder'
+2-1-
+b'000\x01\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x01-dummyFolder/123.txt'
+b'12312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312'
+b'3123123123123123123123123123123123123123123123123123123123123123123123123123123123123123123123123123\n'
+2-2-
+b'000\x01\x00\x00\x00\x12\x00\x00\x00\x00\x00\x00\x00\x00dummyFolder/dummy1'
+3-
+b'000\x02\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/123.txt'
+4-
+b'000\x01\x00\x00\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1'
+5-
+b'000\x01\x00\x00\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2'
+6-
+b'000\x01\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f11'
+7-
+b'000\x01\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f12'
+9-
+b'000\x03\x00\x00\x00D\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f11/321.txt'
+b'000\x04\x00\x00\x00<\x00\x00\x00\x00\x00\x00\x00\x13/dummyFolder/f1/f12'
+10-
+b'000\x03\x00\x00\x00<\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f12'
+b'000\x04\x00\x00\x005\x00\x00\x00\x00\x00\x00\x00\x0c/dummyFolder'
+-?:
+b'000\x03\x00\x00\x00D\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f12/321.txt'
+11-
+b'000\x02\x00\x00\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1'
