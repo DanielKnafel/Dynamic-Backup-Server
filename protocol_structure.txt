@@ -1,0 +1,30 @@
+->General structure:
+[field_name (byte size of field)]
+header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
+MSS = 200
+
+-> NEW (file \ folder)
+cmd = 0x00
+sending:
+    if new file:
+        send header
+        while file not empty : send(file.read(MSS))
+    if new folder:
+        send header
+        for each file : new file
+        for each folder : new folder recursively
+
+-> DEL
+cmd = 0x02
+data_len = 0
+sending:
+    send header
+
+-> MOV
+cmd = 0x03
+path = where moved from
+data_len = 0
+sending:
+    send header
+    send del_from_path : [path_len (8)] [data (path_len)]
+    send del_to_path : [path_len (8)] [data (path_len)]
