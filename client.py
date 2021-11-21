@@ -23,7 +23,8 @@ MSS = 200
 global global_id
 global main_folder
 global parent_folder
-global moved_count
+global ignore_folder_moved
+global ignore_folder_moved_dst
 global created_flag
 
 # **************RECEIVING METHODS************** #
@@ -47,21 +48,19 @@ def create_file(virtual_path, data_len):
 
 
 def move_folder(virt_src_path, virt_dst_path):
-    create_folder()
+    '''#create_folder()
+    abs_src_path = parent_folder + "/" + virt_src_path
+    abs_dst_path = parent_folder + "/" + virt_dst_path
     # Send files
-    for file_name in os.listdir(abs_path):
-        if os.path.isfile(os.path.join(abs_path, file_name)):
-            # for file_name in files:
-            f_abs_path = os.path.join(abs_path, file_name)
-            f_virtual_path = os.path.join(virtual_path, file_name)
-            send_file(f_abs_path, f_virtual_path, client_id)
+
     # Send sub-folders
     for sub_dir in os.listdir(abs_path):
         if not os.path.isfile(os.path.join(abs_path, sub_dir)):
             # for sub_dir in subdirectories:
             send_folder(os.path.join(abs_path, sub_dir),
                         os.path.join(virtual_path, sub_dir),
-                        client_id)
+                        client_id)'''
+    pass
 
 
 def move_file(virt_src_path, virt_dst_path):
@@ -78,9 +77,24 @@ def move_file(virt_src_path, virt_dst_path):
 
 def move_directory(virt_src_path, virt_dst_path):
     if os.path.isfile(virt_src_path):
+        print(f"moving file {virt_src_path} from directory")
         move_file(virt_src_path, virt_dst_path)
     else:
-        move_directory(virt_src_path, virt_dst_path)
+        print(f"moving folder {virt_src_path} from directory")
+        abs_src_path = parent_folder + virt_src_path
+        abs_dst_path = parent_folder + virt_dst_path
+        create_folder(virt_dst_path)
+        for file_name in os.listdir(abs_src_path):
+            if os.path.isfile(os.path.join(abs_src_path, file_name)):
+                # for file_name in files:
+                move_file(virt_src_path, virt_dst_path)
+        for sub_dir in os.listdir(abs_src_path):
+            if not os.path.isfile(os.path.join(abs_src_path, sub_dir)):
+                sub_virt_src_path = virt_src_path + "/" + sub_dir
+                sub_virt_dst_path = virt_dst_path + "/" + sub_dir
+                print(f"going to folder {sub_virt_src_path}")
+                move_directory(sub_virt_src_path, sub_virt_dst_path)
+        os.rmdir(abs_src_path)
 
 
 # **************SENDING METHODS************** #
@@ -184,28 +198,34 @@ def on_deleted(event):
 
 
 def on_modified(event):
-    global moved_count
+    pass
+    ''' global moved_count
     if moved_count > 0:
         # moved_count == 2
         if moved_count > 1:
             moved_count -= 1
         # moved_count == 1
         else:
-
-            moved_count -= 1
+            moved_count -= 1'''
 
 
 def on_moved(event):
-    directory = event.src_path
-    virtual_path = str(directory).replace(parent_folder, '')
+    global ignore_folder_moved
+    global ignore_folder_moved_dst
     dir_size = 0
+    directory = "".join(event.src_path)
+    #print(f"{directory} starts with {ignore_folder_moved}?")
+    virtual_path = str(directory).replace(parent_folder, '')
     header = make_header(len(directory),
                          dir_size,
                          virtual_path,
                          global_id,
                          MOVF)
     send(header)
-    directory = event.dest_path
+    ignore_folder_moved = directory
+        #print("ignore_folder_moved changed")
+    directory = "".join(event.dest_path)
+    #print(f"{directory} starts with {ignore_folder_moved_dst}?")
     dest_path_arr = str(directory).replace(parent_folder, '').split('/')
     virtual_path = "/".join(dest_path_arr[0:-1])
     header = make_header(len(directory),
@@ -214,10 +234,11 @@ def on_moved(event):
                          global_id,
                          MOVT)
     send(header)
+    ignore_folder_moved_dst = directory
+    #print("ignore_folder_moved_dst changed")
 
 
 # **************MAIN************** #
-
 if __name__ == "__main__":
     print("\nClient Active...->")
     dest_ip = dir_path = my_id = ""
@@ -237,15 +258,18 @@ if __name__ == "__main__":
         ancestors = dir_path.split('/')[0:-1]
         global parent_folder
         parent_folder = "/".join(ancestors)
-        global moved_count
-        moved_count = 0
+        global ignore_folder_moved
+        ignore_folder_moved = " "
+        global ignore_folder_moved_dst
+        ignore_folder_moved_dst = " "
         # Communication starts
         listen()
-        create_file("dummyFolder/f2/321.txt", 6)
+
         send_directory(dir_path, my_id)
 
         # Listening?
-        create_folder("/dummyFolder/f2/createdByServer")
+        # create_file("dummyFolder/f2/321.txt", 6) WORKS
+        # create_folder("/dummyFolder/f2/createdByServer") WORKS
         # Watchdog
         event_handler = PatternMatchingEventHandler("[*]")
         event_handler.on_created = on_created
@@ -253,11 +277,16 @@ if __name__ == "__main__":
         event_handler.on_modified = on_modified
         event_handler.on_moved = on_moved
 
+        print("moving f1: from f2 to dummyFolder")
+        move_directory("/dummyFolder/f2/f1", "dummyFolder/")
+        '''
         my_observer = Observer()
         my_observer.schedule(event_handler, dir_path, recursive=True)
         my_observer.start()
+        
         print("\n-> Watchdog Active...->")
         for x in range(1, 60):
             time.sleep(1)
         my_observer.stop()
         my_observer.join()
+        '''
