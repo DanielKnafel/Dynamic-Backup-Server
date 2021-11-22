@@ -15,9 +15,13 @@
 
 ->REMINDER:
 header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
+
+
 ->RESULTS (MESSAGES SENT FROM CLIENT TO SERVER)
-1-(id,cmd, path_len=53,data_len=0                    ,path                                                 )
-b'000\x01\x00\x00\x005\x00\x00\x00\x00\x00\x00\x00\x00/home/itay/Desktop/Programming/IntroToNet/dummyFolder'
+1-with id = '123':
+b'1123\x00\x00\x005/home/itay/Desktop/Programming/IntroToNet/dummyFolder'
+1-with no id:
+b'0\x00\x00\x005/home/itay/Desktop/Programming/IntroToNet/dummyFolder'
 2-1-
 b'000\x01\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x01-dummyFolder/123.txt'
 b'12312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312312'
@@ -43,11 +47,5 @@ b'000\x04\x00\x00\x00<\x00\x00\x00\x00\x00\x00\x00\x13/dummyFolder/f1/f12'
 10-
 b'000\x03\x00\x00\x008\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1'
 b'000\x04\x00\x00\x00;\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2'
-b'000\x03\x00\x00\x00<\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f11'
-b'000\x04\x00\x00\x00?\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2/f1'
-b'000\x03\x00\x00\x00<\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f12'
-b'000\x04\x00\x00\x00?\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2/f1'
-b'000\x03\x00\x00\x00D\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f12/321.txt'
-b'000\x04\x00\x00\x00G\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2/f1/f12'
 11-
 b'000\x02\x00\x00\x00\x12\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2/f1'
