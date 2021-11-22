@@ -3,6 +3,12 @@
 header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
 MSS = 200
 
+-> First message:
+if there is id:
+[1] [id] [path_len] [path]
+if there is no id yet:
+[0] [path_len] [path]
+
 -> NEW (file \ folder)
 cmd = 0x00
 sending:
