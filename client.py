@@ -107,7 +107,7 @@ def make_header(path_len: int, file_size: int, path: str, cl_id: bytes, cmd: int
     message = cl_id +\
               cmd.to_bytes(1, 'big') +\
               path_len.to_bytes(4, 'big') +\
-              file_size.to_bytes(8, 'big') + bytes(path, 'utf-8')
+              file_size.to_bytes(8, 'big') + path.encode()
     return message
 
 
