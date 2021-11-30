@@ -1,12 +1,13 @@
 import os
+import socket
 import time
 
 ZERO = 0x00     # empty stuff
-NEW = 0x01
-DEL = 0x02      # delete
-MOVF = 0x03     # move from
-MOVT = 0x04     # move to
-CHNM = 0x05     # change name of file / folder
+NEWFO = 0x01    # new folder
+NEWFI = 0x02    # new file
+DEL = 0x03      # delete
+MOV = 0x04      # move from
+CHNM = 0x06     # change name of file / folder
 ACK = 0x0E      # ack
 FIN = 0x0F      # end of communication
 MSS = 1e6
@@ -23,15 +24,19 @@ def create_folder(virtual_path, parent_folder):
         time.sleep(0.01)
 
 #tested 95%
-def create_file(virtual_path, data_len, parent_folder):
+def create_file(virtual_path, data_len, parent_folder, s: socket.socket):
     data: bytes
     absolute_path = parent_folder + "/" + virtual_path
+    data_remain = data_len
     with open(absolute_path, 'wb') as new_file:
-        while data_len > 0:
-            data = simulate_listen()
+        while data_remain > 0:
+            read_limit = min(data_remain, MSS)
+            data = s.recv(read_limit)
+            data_read = len(data)
             new_file.write(data)
-            data_len -= len(data)
-        time.sleep(0.05)
+            data_remain -= data_read
+            time.sleep(0.01)
+
 
 # tested 95%
 def delete_dir(abs_path):
@@ -46,9 +51,20 @@ def delete_dir(abs_path):
 # **************MOVING METHODS************** #
 
 
-def change_name(virt_src_path, new_name):
-    if os.path.exists(virt_src_path):
-        pass
+def change_name(virt_src_path, name_len, parent_folder, s: socket.socket):
+    new_name = s.recv(name_len)
+    abs_path = parent_folder + "/" + virt_src_path
+    if os.path.exists(abs_path):
+        current_name = virt_src_path.split("/")[-1]
+        path = virt_src_path.split("/")[0:-1]
+        os.chdir(path)
+        os.rename(current_name, new_name)
+
+
+def move(virt_src_path, destination_len, parent_folder, s: socket.socket):
+    virt_dst_path = s.recv(destination_len)
+    move_directory(virt_src_path, virt_dst_path, parent_folder)
+
 
 # tested 95%
 def move_file(file_name, virt_src_path, virt_dst_path, parent_folder):
@@ -89,14 +105,20 @@ def move_directory(virt_src_path, virt_dst_path, parent_folder):
         print("deleting folder " + virt_src_path)
         delete_dir(abs_src_path)
 
-# **************SENDING METHODS************** #
+# **************COMMUNICATION METHODS************** #
 
 
-def make_header(path_len: int, file_size: int, path: str, cl_id: bytes, cmd: int):
-    message = cl_id +\
-              cmd.to_bytes(1, 'big') +\
+def communication_finished(s: socket.socket):
+    print("finishing : closing socket")
+    s.close()
+
+
+def make_header(cmd: int, path_len: int, data_len: int, path: str):
+    #cl_id +\
+    message = cmd.to_bytes(1, 'big') +\
               path_len.to_bytes(4, 'big') +\
-              file_size.to_bytes(8, 'big') + bytes(path, 'utf-8')
+              data_len.to_bytes(8, 'big') +\
+              bytes(path, 'utf-8')
     return message
 
 
@@ -110,31 +132,35 @@ def send(data):
     print(data)
 
 
-def parse_message(single_message):
-    cmd = single_message[0]
-    if NEW == cmd:
-        pass
-    elif DEL == cmd:
-        pass
-    elif MOVF == cmd:
-        pass
-    elif MOVT == cmd:
-        pass
-    elif CHNM == cmd:
-        pass
-    elif ACK  == cmd:
-        pass
-    elif FIN  == cmd:
-        pass
+# NOT for 1st message
+def read_from_buffer(parent_folder, s: socket.socket, ip: bytes, port: int):
+    s.connect((ip, port))
+    cmd = b'start'
+    while cmd != b'':
+        cmd = s.recv(1)
+        path_len = int.from_bytes(s.recv(4), 'big')
+        data_len = int.from_bytes(s.recv(8), 'big')
+        path = s.recv(path_len)
+        if cmd == NEWFI:
+            create_file(path, data_len, parent_folder, s)
+        elif cmd == CHNM:
+            change_name(path, data_len, parent_folder, s)
+        elif cmd == MOV:
+            move(path, data_len, parent_folder, s)
+        elif cmd == NEWFO:
+            create_folder(path, parent_folder)
+        elif cmd == DEL:
+            delete_dir(parent_folder + "/" + path)
+        elif cmd == FIN:
+            pass
+        else:
+            print(f"invalid cmd -{cmd}-")
+    s.close()
 
 
 def send_file(abs_path, virtual_path, client_id):
     # print(f"send file {abs_path}")
-    header = make_header(len(virtual_path),
-                         os.path.getsize(abs_path),
-                         virtual_path,
-                         client_id,
-                         NEW)
+    header = make_header(NEWFI, len(virtual_path), os.path.getsize(abs_path), virtual_path)
     send(header)
 
     # notice the changes in root
@@ -147,7 +173,7 @@ def send_file(abs_path, virtual_path, client_id):
 
 
 def send_folder(abs_path, virtual_path, client_id):
-    header = make_header(len(virtual_path), 0, virtual_path, client_id, NEW)
+    header = make_header(NEWFO, len(virtual_path), 0, virtual_path)
     send(header)
     # Send files
     for file_name in os.listdir(abs_path):

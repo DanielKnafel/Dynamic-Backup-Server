@@ -33,11 +33,10 @@ def on_deleted(event):
     directory = event.src_path
     virtual_path = str(directory).replace(parent_folder, '')
     dir_size = 0
-    header = u.make_header(len(virtual_path),
+    header = u.make_header(u.DEL,
+                         len(virtual_path),
                          dir_size,
-                         virtual_path,
-                         global_id,
-                         u.DEL)
+                         directory)
     send(header)
 
 
@@ -48,26 +47,13 @@ def on_modified(event):
 def on_moved(event):
     global ignore_folder_moved
     global ignore_folder_moved_dst
-    dir_size = 0
-    directory = "".join(event.src_path)
-    #print(f"{directory} starts with {ignore_folder_moved}?")
-    virtual_path = str(directory).replace(parent_folder, '')
-    header = u.make_header(len(directory),
-                         dir_size,
-                         virtual_path,
-                         global_id,
-                         u.MOVF)
+    src_path = "".join(event.src_path)
+    dst_path = b''.join(event.src_path)
+    virt_src_path = str(src_path).replace(parent_folder, '')
+    virt_dst_path = str(dst_path).replace(parent_folder, '')
+    header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path)
     send(header)
-
-    directory = "".join(event.dest_path)
-    dest_path_arr = str(directory).replace(parent_folder, '').split('/')
-    virtual_path = "/".join(dest_path_arr[0:-1])
-    header = u.make_header(len(directory),
-                         dir_size,
-                         virtual_path,
-                         global_id,
-                         u.MOVT)
-    send(header)
+    send(virt_dst_path)
 
 
 # **************MAIN************** #
@@ -76,7 +62,7 @@ def send(data):
     print(data)
 
 
-def activate(waiting_time):
+def activate(waiting_time, abs_path):
     event_handler = PatternMatchingEventHandler("[*]")
     event_handler.on_created = on_created
     event_handler.on_deleted = on_deleted
@@ -84,12 +70,12 @@ def activate(waiting_time):
     event_handler.on_moved = on_moved
 
     my_observer = Observer()
-    my_observer.schedule(event_handler, dir_path, recursive=True)
+    my_observer.schedule(event_handler, abs_path, recursive=True)
     my_observer.start()
     print("\n-> Watchdog Active...->")
 
     print("\n-> TCP Active...->")
-    u.send_directory(dir_path, my_id, parent_folder)
+    u.send_directory(abs_path, my_id, parent_folder)
 
     for x in range(1, 60):
         time.sleep(waiting_time)
@@ -127,4 +113,4 @@ if __name__ == "__main__":
             response = u.simulate_listen()
             my_id = response[1:]
 
-        u.parse_message(u.FIN.to_bytes(1, 'big') + b'abcd')
+        u.parse_message(b'\x01\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x01-dummyFolder/123.txt')
