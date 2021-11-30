@@ -7,6 +7,7 @@ DEL = 0x02      # delete
 MOVF = 0x03     # move from
 MOVT = 0x04     # move to
 CHNM = 0x05     # change name of file / folder
+ACK = 0x0E      # ack
 FIN = 0x0F      # end of communication
 MSS = 1e6
 # **************CREATING & DELETING METHODS************** #
@@ -107,6 +108,24 @@ def simulate_listen():
 
 def send(data):
     print(data)
+
+
+def parse_message(single_message):
+    cmd = single_message[0]
+    if NEW == cmd:
+        pass
+    elif DEL == cmd:
+        pass
+    elif MOVF == cmd:
+        pass
+    elif MOVT == cmd:
+        pass
+    elif CHNM == cmd:
+        pass
+    elif ACK  == cmd:
+        pass
+    elif FIN  == cmd:
+        pass
 
 
 def send_file(abs_path, virtual_path, client_id):

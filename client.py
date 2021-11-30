@@ -72,6 +72,7 @@ def on_moved(event):
 
 # **************MAIN************** #
 def send(data):
+
     print(data)
 
 
@@ -96,11 +97,14 @@ def activate(waiting_time):
     my_observer.join()
 
 
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 if __name__ == "__main__":
     print("\nClient Active...->")
     dest_ip = dir_path = my_id = ""
     dest_port = duration = 0
-    if len(sys.argv) >= 5:
+    if len(sys.argv) < 5:
+        exit()
+    else:
         # BEFORE communicating with server
         dest_ip, dest_port, dir_path, duration = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4])
         global global_id
@@ -121,3 +125,6 @@ if __name__ == "__main__":
         else:
             send(b'0' + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
             response = u.simulate_listen()
+            my_id = response[1:]
+
+        u.parse_message(u.FIN.to_bytes(1, 'big') + b'abcd')

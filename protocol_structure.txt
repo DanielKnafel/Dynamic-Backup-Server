@@ -1,6 +1,6 @@
 ->General structure:
 [field_name (byte size of field)]
-header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
+header = [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
 MSS = 200
 
 -> First message:
