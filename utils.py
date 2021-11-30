@@ -1,60 +1,92 @@
 import os
+import time
 
-ZERO = 0x00
+ZERO = 0x00     # empty stuff
 NEW = 0x01
-DEL = 0x02
-MOVF = 0x03
-MOVT = 0x04
-MSS = 200
+DEL = 0x02      # delete
+MOVF = 0x03     # move from
+MOVT = 0x04     # move to
+CHNM = 0x05     # change name of file / folder
+FIN = 0x0F      # end of communication
+MSS = 1e6
+# **************CREATING & DELETING METHODS************** #
+# for tcp requests
 
-def move_folder(virt_src_path, virt_dst_path, parent_folder):
-    '''#create_folder()
-    abs_src_path = parent_folder + "/" + virt_src_path
-    abs_dst_path = parent_folder + "/" + virt_dst_path
-    # Send files
+#tested 95%
+def create_folder(virtual_path, parent_folder):
+    absolute_path = parent_folder + "/" + virtual_path
+    # os.chmod(os.path.join(parent_folder, "dummyFolder"), mode=0o777)
+    if not os.path.exists(absolute_path):
+        print(f"trying to create folder named {virtual_path} on {parent_folder}")
+        os.mkdir(absolute_path)
+        time.sleep(0.01)
 
-    # Send sub-folders
-    for sub_dir in os.listdir(abs_path):
-        if not os.path.isfile(os.path.join(abs_path, sub_dir)):
-            # for sub_dir in subdirectories:
-            send_folder(os.path.join(abs_path, sub_dir),
-                        os.path.join(virtual_path, sub_dir),
-                        client_id)'''
-    pass
+#tested 95%
+def create_file(virtual_path, data_len, parent_folder):
+    data: bytes
+    absolute_path = parent_folder + "/" + virtual_path
+    with open(absolute_path, 'wb') as new_file:
+        while data_len > 0:
+            data = simulate_listen()
+            new_file.write(data)
+            data_len -= len(data)
+        time.sleep(0.05)
+
+# tested 95%
+def delete_dir(abs_path):
+    if os.path.exists(abs_path):
+        if os.path.isfile(abs_path):
+            os.remove(abs_path)
+        else:
+            for sub_dir in os.listdir(abs_path):
+                delete_dir(os.path.join(abs_path, sub_dir))
+            os.rmdir(abs_path)
+
+# **************MOVING METHODS************** #
 
 
-def move_file(virt_src_path, virt_dst_path, parent_folder):
-    abs_src_path = parent_folder + "/" + virt_src_path
-    abs_dst_path = parent_folder + "/" + virt_dst_path
+def change_name(virt_src_path, new_name):
+    if os.path.exists(virt_src_path):
+        pass
+
+# tested 95%
+def move_file(file_name, virt_src_path, virt_dst_path, parent_folder):
+    abs_src_path = parent_folder + "/" + virt_src_path + "/" + file_name
+    abs_dst_path = parent_folder + "/" + virt_dst_path + "/" + file_name
     with open(abs_src_path, 'rb') as original_file:
         with open(abs_dst_path, 'wb') as new_file:
-            file_data = original_file.read(MSS)
+            file_data = original_file.read(int(MSS))
             while file_data != b'':
                 new_file.write(file_data)
-                file_data = original_file.read(MSS)
-    os.remove(abs_src_path)
+                file_data = original_file.read(int(MSS))
+    delete_dir(abs_src_path)
 
-
+# tested 85%
 def move_directory(virt_src_path, virt_dst_path, parent_folder):
-    if os.path.isfile(virt_src_path):
-        print(f"moving file {virt_src_path} from directory")
-        move_file(virt_src_path, virt_dst_path)
+    if os.path.isfile(parent_folder + "/" + virt_src_path):
+        file_name = virt_src_path.split("/")[-1]
+        print(f"moving file {file_name} from directory " + virt_src_path)
+        move_file(file_name, virt_src_path, virt_dst_path, parent_folder)
     else:
-        print(f"moving folder {virt_src_path} from directory")
-        abs_src_path = parent_folder + virt_src_path
-        abs_dst_path = parent_folder + virt_dst_path
-        create_folder(virt_dst_path)
+        folder_name = virt_src_path.split("/")[-1]
+        print(f"moving folder {folder_name} from directory " + virt_src_path)
+        abs_src_path = parent_folder + "/" + virt_src_path
+        # abs_dst_path = parent_folder + "/" + virt_dst_path
+        virt_dst_path = virt_dst_path + "/" + folder_name
+        create_folder(virt_dst_path, parent_folder)
         for file_name in os.listdir(abs_src_path):
             if os.path.isfile(os.path.join(abs_src_path, file_name)):
+                print("moving file " + file_name + " from " + virt_src_path)
                 # for file_name in files:
-                move_file(virt_src_path, virt_dst_path)
+                move_file(file_name, virt_src_path, virt_dst_path, parent_folder)
         for sub_dir in os.listdir(abs_src_path):
             if not os.path.isfile(os.path.join(abs_src_path, sub_dir)):
                 sub_virt_src_path = virt_src_path + "/" + sub_dir
-                sub_virt_dst_path = virt_dst_path + "/" + sub_dir
+                #sub_virt_dst_path = virt_dst_path + "/" + sub_dir
                 print(f"going to folder {sub_virt_src_path}")
-                move_directory(sub_virt_src_path, sub_virt_dst_path)
-        os.rmdir(abs_src_path)
+                move_directory(sub_virt_src_path, virt_dst_path, parent_folder)
+        print("deleting folder " + virt_src_path)
+        delete_dir(abs_src_path)
 
 # **************SENDING METHODS************** #
 
@@ -67,9 +99,10 @@ def make_header(path_len: int, file_size: int, path: str, cl_id: bytes, cmd: int
     return message
 
 
-def listen():
+def simulate_listen():
     print("Simulating listening")
-    return b'.'
+    now = time.strftime("%d-%m-%Y %H:%M:%S")
+    return bytes(now, 'utf-8')
 
 
 def send(data):
@@ -87,11 +120,11 @@ def send_file(abs_path, virtual_path, client_id):
 
     # notice the changes in root
     with open(abs_path, 'rb') as opened_file:
-        file_data = opened_file.read(MSS)
+        file_data = opened_file.read(int(MSS))
         # print(f"read from file {file_data}")
         while file_data != b'':
             send(file_data)
-            file_data = opened_file.read(MSS)
+            file_data = opened_file.read(int(MSS))
 
 
 def send_folder(abs_path, virtual_path, client_id):
