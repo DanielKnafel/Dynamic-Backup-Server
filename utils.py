@@ -11,6 +11,8 @@ CHNM = 0x06     # change name of file / folder
 ACK = 0x0E      # ack
 FIN = 0x0F      # end of communication
 MSS = 1e6
+
+SEP = os.sep
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
@@ -99,7 +101,6 @@ def move_directory(virt_src_path, virt_dst_path, parent_folder):
         for sub_dir in os.listdir(abs_src_path):
             if not os.path.isfile(os.path.join(abs_src_path, sub_dir)):
                 sub_virt_src_path = virt_src_path + "/" + sub_dir
-                #sub_virt_dst_path = virt_dst_path + "/" + sub_dir
                 print(f"going to folder {sub_virt_src_path}")
                 move_directory(sub_virt_src_path, virt_dst_path, parent_folder)
         print("deleting folder " + virt_src_path)
@@ -113,15 +114,6 @@ def communication_finished(s: socket.socket):
     s.close()
 
 
-def make_header(cmd: int, path_len: int, data_len: int, path: str):
-    #cl_id +\
-    message = cmd.to_bytes(1, 'big') +\
-              path_len.to_bytes(4, 'big') +\
-              data_len.to_bytes(8, 'big') +\
-              bytes(path, 'utf-8')
-    return message
-
-
 def simulate_listen():
     print("Simulating listening")
     now = time.strftime("%d-%m-%Y %H:%M:%S")
@@ -133,7 +125,8 @@ def send(data):
 
 
 # NOT for 1st message
-def read_from_buffer(parent_folder, s: socket.socket, ip: bytes, port: int):
+# For now - probably good only for client
+'''def read_from_buffer(parent_folder, s: socket.socket, ip: bytes, port: int):
     s.connect((ip, port))
     cmd = b'start'
     while cmd != b'':
@@ -152,10 +145,24 @@ def read_from_buffer(parent_folder, s: socket.socket, ip: bytes, port: int):
         elif cmd == DEL:
             delete_dir(parent_folder + "/" + path)
         elif cmd == FIN:
-            pass
+            communication_finished(s)
         else:
             print(f"invalid cmd -{cmd}-")
-    s.close()
+        time.sleep(0.005)
+    try:
+        s.close()
+    except:
+        pass'''
+
+
+# **************NOTIFY METHODS************** #
+def make_header(cmd: int, path_len: int, data_len: int, path: str):
+    #cl_id +\
+    message = cmd.to_bytes(1, 'big') +\
+              path_len.to_bytes(4, 'big') +\
+              data_len.to_bytes(8, 'big') +\
+              bytes(path, 'utf-8')
+    return message
 
 
 def send_file(abs_path, virtual_path, client_id):

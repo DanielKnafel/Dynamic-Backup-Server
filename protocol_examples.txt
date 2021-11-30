@@ -3,7 +3,10 @@
 2-1 - folder already has 123.txt: with 100 time '123'
 2-2 - folder already has folder dummy1
 3-  delete 123.txt
-4-  create new folder f1
+4-1 - create new folder folder1
+4-2 - rename folder1 to f1
+4-3 - create file f1123.txt: with '123'
+4-4 - edit f1123.txt to '123123123'
 5-  create new folder f2
 6-  create new folder f11 in f1
 7-  create new folder f12 in f1
@@ -15,7 +18,10 @@
 
 ->REMINDER:
 header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
-->RESULTS (MESSAGES SENT FROM CLIENT TO SERVER)
+->RESULTS
+
+
+->OLD RESULTS (MESSAGES SENT FROM CLIENT TO SERVER)
 1-with id = '123':
 b'1123\x00\x00\x005/home/itay/Desktop/Programming/IntroToNet/dummyFolder'
 1-with no id:
