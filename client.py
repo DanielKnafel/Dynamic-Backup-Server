@@ -17,9 +17,11 @@ global g_parent_folder
 global ignore_folder_moved
 global ignore_folder_moved_dst
 global created_flag
+global connect_info
 
 
 def on_created(event):
+    my_socket.connect(connect_info)
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     time.sleep(0.05)
@@ -27,17 +29,17 @@ def on_created(event):
         u.send_file(directory, virtual_path, global_id)
     else:
         u.send_folder(directory, virtual_path, global_id)
+    my_socket.close()
 
 
 def on_deleted(event):
+    my_socket.connect(connect_info)
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     dir_size = 0
-    header = u.make_header(u.DEL,
-                         len(virtual_path),
-                         dir_size,
-                         directory)
+    header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, global_id)
     send(header)
+    my_socket.close()
 
 
 def on_modified(event):
@@ -45,20 +47,22 @@ def on_modified(event):
 
 
 def on_moved(event):
+    my_socket.connect(connect_info)
     global ignore_folder_moved
     global ignore_folder_moved_dst
     src_path = "".join(event.src_path)
     dst_path = b''.join(event.src_path)
     virt_src_path = str(src_path).replace(g_parent_folder, '')
     virt_dst_path = str(dst_path).replace(g_parent_folder, '')
-    header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path)
+    header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path, global_id)
     send(header)
     send(virt_dst_path)
+    my_socket.close()
 
 
 # **************MAIN************** #
-def read_from_buffer(parent_folder, s: socket.socket, ip: bytes, port: int):
-    s.connect((ip, port))
+def read_from_buffer(parent_folder, s: socket.socket, ip: str, port: int):
+    s.connect(connect_info)
     cmd = b'start'
     while cmd != b'':
         cmd = s.recv(1)
@@ -76,21 +80,28 @@ def read_from_buffer(parent_folder, s: socket.socket, ip: bytes, port: int):
         elif cmd == u.DEL:
             u.delete_dir(parent_folder + "/" + path)
         elif cmd == u.FIN:
-            u.communication_finished(s)
+            print(f"finished reading")
+            break
         else:
             print(f"invalid cmd -{cmd}-")
+            break
         time.sleep(0.005)
     try:
         s.close()
     except:
         pass
 
+
 def send(data):
     print(data)
+    try:
+        my_socket.send(data)
+    except:
+        print("socket close")
     # USE GLOBAL s
 
 
-def activate(ip: bytes,
+def activate(ip: str,
              port: int,
              waiting_time,
              abs_path,
@@ -108,7 +119,9 @@ def activate(ip: bytes,
     print("\n-> Watchdog Active...->")
     for x in range(1, 60):
         time.sleep(waiting_time)
+        my_observer.stop()
         read_from_buffer(parent_folder, s, ip, port)
+        my_observer.start()
     my_observer.stop()
     my_observer.join()
 
@@ -134,17 +147,19 @@ if __name__ == "__main__":
         ignore_folder_moved = " "
         global ignore_folder_moved_dst
         ignore_folder_moved_dst = " "
+        global connect_info
+        connect_info = (dest_ip, dest_port)
         if len(sys.argv) == 6:
-            my_id = sys.argv[5]
-            send(b'1' + bytes(my_id, 'utf-8') + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
+            global_id = sys.argv[5]
+            send(u.EID + bytes(global_id, 'utf-8') + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
             response = u.simulate_listen()
         else:
-            send(b'0' + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
+            send(u.NID + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
             response = u.simulate_listen()
-            my_id = response[1:]
-            u.send_directory(bytes(dir_path, 'utf-8'), my_id, g_parent_folder)
+            global_id = response[1:]
+            u.send_directory(bytes(dir_path, 'utf-8'), global_id, g_parent_folder)
 
-        activate(bytes(dest_ip, 'utf-8'),
+        activate(dest_ip,
                  dest_port,
                  duration,
                  dir_path,
