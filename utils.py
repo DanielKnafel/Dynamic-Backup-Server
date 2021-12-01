@@ -15,6 +15,7 @@ EID = 0x11
 MSS = 1e6
 
 SEP = os.sep
+my_socket: socket.socket
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
@@ -124,6 +125,11 @@ def simulate_listen():
 
 def send(data):
     print(data)
+    try:
+        my_socket.send(data)
+    except:
+        print(f"socket error. can't send {data}")
+    # USE GLOBAL s
 
 
 # NOT for 1st message

@@ -7,6 +7,7 @@ from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 
 import utils as u
+
 from watchdog.events import LoggingEventHandler
 print("delete importing time?")
 
@@ -38,7 +39,7 @@ def on_deleted(event):
     virtual_path = str(directory).replace(g_parent_folder, '')
     dir_size = 0
     header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, global_id)
-    send(header)
+    u.send(header)
     my_socket.close()
 
 
@@ -55,8 +56,8 @@ def on_moved(event):
     virt_src_path = str(src_path).replace(g_parent_folder, '')
     virt_dst_path = str(dst_path).replace(g_parent_folder, '')
     header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path, global_id)
-    send(header)
-    send(virt_dst_path)
+    u.send(header)
+    u.send(virt_dst_path)
     my_socket.close()
 
 
@@ -92,15 +93,6 @@ def read_from_buffer(parent_folder, s: socket.socket, ip: str, port: int):
         pass
 
 
-def send(data):
-    print(data)
-    try:
-        my_socket.send(data)
-    except:
-        print("socket close")
-    # USE GLOBAL s
-
-
 def activate(ip: str,
              port: int,
              waiting_time,
@@ -127,6 +119,8 @@ def activate(ip: str,
 
 
 my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+my_socket.settimeout(0.5)
+u.my_socket = my_socket
 if __name__ == "__main__":
     print("\nClient Active...->")
     dest_ip = dir_path = my_id = ""
@@ -149,15 +143,18 @@ if __name__ == "__main__":
         ignore_folder_moved_dst = " "
         global connect_info
         connect_info = (dest_ip, dest_port)
+
+        my_socket.connect(connect_info)
         if len(sys.argv) == 6:
             global_id = sys.argv[5]
-            send(u.EID + bytes(global_id, 'utf-8') + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
-            response = u.simulate_listen()
+            u.send(u.EID + bytes(global_id, 'utf-8') + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
+            ack = my_socket.recv(1)
         else:
-            send(u.NID + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
-            response = u.simulate_listen()
-            global_id = response[1:]
+            u.send(u.NID + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
+            ack = my_socket.recv(1)
+            global_id = my_socket.recv(128)
             u.send_directory(bytes(dir_path, 'utf-8'), global_id, g_parent_folder)
+        my_socket.close()
 
         activate(dest_ip,
                  dest_port,
