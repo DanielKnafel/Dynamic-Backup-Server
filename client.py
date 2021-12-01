@@ -153,7 +153,7 @@ if __name__ == "__main__":
             u.send(u.NID + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
             ack = my_socket.recv(1)
             global_id = my_socket.recv(128)
-            u.send_directory(bytes(dir_path, 'utf-8'), global_id, g_parent_folder)
+            u.send_directory(bytes(dir_path, 'utf-8'), g_parent_folder, global_id)
         my_socket.close()
 
         activate(dest_ip,
