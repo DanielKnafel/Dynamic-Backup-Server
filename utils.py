@@ -2,6 +2,13 @@ import os
 import socket
 import time
 
+# coded sizes in bytes
+KEY_SIZE = 128
+COMMAND_SIZE = 1
+PATH_LEN_SIZE = 4
+FILE_SIZE = 8
+
+# commands
 ZERO = 0x00     # empty stuff
 NEWFO = 0x01    # new folder
 NEWFI = 0x02    # new file
@@ -10,12 +17,12 @@ MOV = 0x04      # move from
 CHNM = 0x06     # change name of file / folder
 ACK = 0x0E      # ack
 FIN = 0x0F      # end of communication
-NID = 0x10
-EID = 0x11
+NID = 0x10      # no id
+EID = 0x11      # exiting id
 MSS = 1e6
 
 SEP = os.sep
-#my_socket: socket.socket
+my_socket: socket.socket
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
@@ -125,12 +132,10 @@ def simulate_listen():
 
 def send(data):
     print(data)
-    '''
     try:
-        #my_socket.send(data)
+        my_socket.send(data)
     except:
         print(f"socket error. can't send {data}")
-    '''
     # USE GLOBAL s
 
 
@@ -179,7 +184,7 @@ def make_header(cmd: int,
     return message
 
 
-def send_file(abs_path, virtual_path, client_id):
+def send_file(abs_path, virtual_path, client_id=''):
     # print(f"send file {abs_path}")
     header = make_header(NEWFI, len(virtual_path), os.path.getsize(abs_path), virtual_path, client_id)
     send(header)
@@ -193,7 +198,7 @@ def send_file(abs_path, virtual_path, client_id):
             file_data = opened_file.read(int(MSS))
 
 
-def send_folder(abs_path, virtual_path, client_id):
+def send_folder(abs_path, virtual_path, client_id=''):
     header = make_header(NEWFO, len(virtual_path), 0, virtual_path, client_id)
     send(header)
     # Send files
@@ -212,7 +217,7 @@ def send_folder(abs_path, virtual_path, client_id):
                         client_id)
 
 
-def send_directory(path: bytes, client_id, main_folder):
+def send_directory(path, main_folder, client_id=''):
     # Request for creating main folder already done in main()
     # Send files
     for file_name in os.listdir(path):
