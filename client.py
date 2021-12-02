@@ -22,25 +22,28 @@ global connect_info
 
 
 def on_created(event):
-    my_socket.connect(connect_info)
+    #my_socket.connect(connect_info)
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     time.sleep(0.05)
-    if os.path.isfile(directory):
-        u.send_file(directory, virtual_path, global_id)
+    if os.path.exists(directory):
+        if os.path.isfile(directory):
+            u.send_file(directory, virtual_path, global_id)
+        else:
+            u.send_folder(directory, virtual_path, global_id)
     else:
-        u.send_folder(directory, virtual_path, global_id)
-    my_socket.close()
+        print(f"--> Directory not exists: {directory}")
+    #my_socket.close()
 
 
 def on_deleted(event):
-    my_socket.connect(connect_info)
+    #my_socket.connect(connect_info)
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     dir_size = 0
     header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, global_id)
     u.send(header)
-    my_socket.close()
+    #my_socket.close()
 
 
 def on_modified(event):
@@ -48,17 +51,22 @@ def on_modified(event):
 
 
 def on_moved(event):
-    my_socket.connect(connect_info)
-    global ignore_folder_moved
-    global ignore_folder_moved_dst
+    #my_socket.connect(connect_info)
+
     src_path = "".join(event.src_path)
-    dst_path = b''.join(event.src_path)
-    virt_src_path = str(src_path).replace(g_parent_folder, '')
-    virt_dst_path = str(dst_path).replace(g_parent_folder, '')
-    header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path, global_id)
-    u.send(header)
-    u.send(virt_dst_path)
-    my_socket.close()
+    dst_path = "".join(event.dest_path)
+    time.sleep(0.05)
+    if os.path.exists(dst_path) or os.path.exists(src_path):
+        dir_name = dst_path.split("/")[-1]
+        virt_src_path = str(src_path).replace(g_parent_folder, '')
+        virt_dst_path = str(dst_path).replace(g_parent_folder, '')
+        virt_dst_path = virt_dst_path.replace("/" + dir_name, '')
+        header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path, global_id)
+        u.send(header)
+        u.send(virt_dst_path)
+    else:
+        print(f"--> Directory not exists:\n--->src= {src_path}\n--->dst= {dst_path}")
+    #my_socket.close()
 
 
 # **************MAIN************** #
@@ -111,15 +119,15 @@ def activate(ip: str,
     print("\n-> Watchdog Active...->")
     for x in range(1, 60):
         time.sleep(waiting_time)
-        my_observer.stop()
-        read_from_buffer(parent_folder, s, ip, port)
-        my_observer.start()
+        #my_observer.stop()
+        #read_from_buffer(parent_folder, s, ip, port)
+        #my_observer.start()
     my_observer.stop()
     my_observer.join()
 
 
 my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-my_socket.settimeout(0.5)
+#my_socket.settimeout(0.5)
 u.my_socket = my_socket
 if __name__ == "__main__":
     print("\nClient Active...->")
@@ -129,7 +137,7 @@ if __name__ == "__main__":
         exit()
     else:
         # BEFORE communicating with server
-        dest_ip, dest_port, dir_path, duration = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4])
+        dest_ip, dest_port, dir_path, duration = sys.argv[1], int(sys.argv[2]), sys.argv[3], float(sys.argv[4])
         global global_id
         global_id = my_id
         global main_folder
@@ -144,21 +152,25 @@ if __name__ == "__main__":
         global connect_info
         connect_info = (dest_ip, dest_port)
 
-        my_socket.connect(connect_info)
+        print(f"dir = {dir_path}")
+
+        #my_socket.connect(connect_info)
         if len(sys.argv) == 6:
             global_id = sys.argv[5]
-            u.send(u.EID + bytes(global_id, 'utf-8') + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
-            ack = my_socket.recv(1)
+            meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=global_id)
+            u.send(meet_server)
+            #ack = my_socket.recv(1)
         else:
-            u.send(u.NID + len(dir_path).to_bytes(4, 'big') + bytes(dir_path, 'utf-8'))
-            ack = my_socket.recv(1)
-            global_id = my_socket.recv(128)
-            u.send_directory(bytes(dir_path, 'utf-8'), g_parent_folder, global_id)
-        my_socket.close()
+            meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path)
+            u.send(meet_server)
+            #ack = my_socket.recv(1)
+            #global_id = my_socket.recv(128)
+            u.send_directory(bytes(dir_path, 'utf-8'), global_id, g_parent_folder)
+        #my_socket.close()
 
         activate(dest_ip,
                  dest_port,
-                 duration,
+                 5,
                  dir_path,
                  g_parent_folder,
                  my_socket)

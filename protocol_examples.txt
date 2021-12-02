@@ -1,5 +1,5 @@
-->TEST PROCESS
-1-  create connection with id=0. folder to clone: dummyFolder
+->TEST PROCESS - WITH ID=007
+1-  create connection with id=007. folder to clone: dummyFolder
 2-1 - folder already has 123.txt: with 100 time '123'
 2-2 - folder already has folder dummy1
 3-  delete 123.txt
