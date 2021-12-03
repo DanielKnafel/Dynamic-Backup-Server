@@ -19,12 +19,14 @@ ACK = 0x0E      # ack
 FIN = 0x0F      # end of communication
 NID = 0x10      # no id
 EID = 0x11      # exiting id
+UPDT = 0x12      # client to server : update ME
 MSS = 1e6
 
 SEP = os.sep
 my_socket: socket.socket
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
+
 
 #tested 95%
 def create_folder(virtual_path, parent_folder):
@@ -34,6 +36,7 @@ def create_folder(virtual_path, parent_folder):
         print(f"trying to create folder named {virtual_path} on {parent_folder}")
         os.mkdir(absolute_path)
         time.sleep(0.01)
+
 
 #tested 95%
 def create_file(virtual_path, data_len, parent_folder, s: socket.socket):
@@ -59,6 +62,8 @@ def delete_dir(abs_path):
             for sub_dir in os.listdir(abs_path):
                 delete_dir(os.path.join(abs_path, sub_dir))
             os.rmdir(abs_path)
+    else:
+        pass
 
 # **************MOVING METHODS************** #
 
@@ -71,26 +76,35 @@ def change_name(virt_src_path, name_len, parent_folder, s: socket.socket):
         path = virt_src_path.split("/")[0:-1]
         os.chdir(path)
         os.rename(current_name, new_name)
+    else:
+        pass
 
 
 def move(virt_src_path, destination_len, parent_folder, s: socket.socket):
     virt_dst_path = s.recv(destination_len)
-    move_directory(virt_src_path, virt_dst_path, parent_folder)
+    if os.path.exists(parent_folder + "/" + virt_src_path):
+        move_directory(virt_src_path, virt_dst_path, parent_folder)
+    else:
+        pass
 
 
-# tested 95%
+# existence verification in move()
 def move_file(file_name, virt_src_path, virt_dst_path, parent_folder):
     abs_src_path = parent_folder + "/" + virt_src_path + "/" + file_name
     abs_dst_path = parent_folder + "/" + virt_dst_path + "/" + file_name
-    with open(abs_src_path, 'rb') as original_file:
-        with open(abs_dst_path, 'wb') as new_file:
-            file_data = original_file.read(int(MSS))
-            while file_data != b'':
-                new_file.write(file_data)
+    if os.path.exists(abs_src_path):
+        with open(abs_src_path, 'rb') as original_file:
+            with open(abs_dst_path, 'wb') as new_file:
                 file_data = original_file.read(int(MSS))
-    delete_dir(abs_src_path)
+                while file_data != b'':
+                    new_file.write(file_data)
+                    file_data = original_file.read(int(MSS))
+        delete_dir(abs_src_path)
+    else:
+        pass
 
-# tested 85%
+
+# existence verification in move()
 def move_directory(virt_src_path, virt_dst_path, parent_folder):
     if os.path.isfile(parent_folder + "/" + virt_src_path):
         file_name = virt_src_path.split("/")[-1]
@@ -116,6 +130,7 @@ def move_directory(virt_src_path, virt_dst_path, parent_folder):
         print("deleting folder " + virt_src_path)
         delete_dir(abs_src_path)
 
+
 # **************COMMUNICATION METHODS************** #
 
 
@@ -135,7 +150,8 @@ def send(data):
     try:
         my_socket.send(data)
     except:
-        print(f"socket error. can't send {data}")
+        pass
+        #print(f"socket error. can't send {data}")
     # USE GLOBAL s
 
 

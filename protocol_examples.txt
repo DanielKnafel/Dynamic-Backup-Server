@@ -1,12 +1,12 @@
 ->TEST PROCESS - WITH ID=007
 1-  create connection with id=007. folder to clone: dummyFolder
-2-1 - folder already has 123.txt: with 100 time '123'
-2-2 - folder already has folder dummy1
+1-1 - folder already has 123.txt: '123'
+1-2 - folder already has folder dummy1
 3-  delete 123.txt
 4-1 - create new folder folder1
-4-2 - rename folder1 to f1
-4-3 - create file f1123.txt: with '123'
-4-4 - edit f1123.txt to '123123123'
+4-2 - create file 123.txt: with '123'
+4-3 - rename folder1 to f1
+4-4 - edit 123.txt to '123123123' ?
 5-  create new folder f2
 6-  create new folder f11 in f1
 7-  create new folder f12 in f1
@@ -17,8 +17,38 @@
 
 
 ->REMINDER:
-header = [id (128)] [cmd(1)] [path_len(4)] [data_len(8)] [path (path_len)]
+header = [cmd(1)] [id (128)] [path_len(4)] [data_len(8)] [path (path_len)]
 ->RESULTS
+																3
+b'\x03007\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00\x00/home/itay/Desktop/Programming/IntroToNet/dummyFolder/123.txt'
+																4-1
+b'\x01007\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/folder1'
+																4-2
+b'\x02007\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00\x04/dummyFolder/123.txt'
+b'123\n'
+																4-3
+b'\x06007\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00\x02/dummyFolder/folder1'
+f1
+--> Directory not exists: /home/itay/Desktop/Programming/IntroToNet/dummyFolder/.goutputstream-EX0TD1
+b'\x06007\x00\x00\x00"\x00\x00\x00\x00\x00\x00\x00\x07/dummyFolder/.goutputstream-EX0TD1'
+123.txt
+																5
+b'\x01007\x00\x00\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f2'
+																6
+b'\x01007\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f11'
+																7
+b'\x01007\x00\x00\x00\x13\x00\x00\x00\x00\x00\x00\x00\x00/dummyFolder/f1/f12'
+																8
+b'\x02007\x00\x00\x00\x1b\x00\x00\x00\x00\x00\x00\x00\x04/dummyFolder/f1/f11/321.txt'
+b'321\n'
+																9
+b'\x04007\x00\x00\x00\x1b\x00\x00\x00\x00\x00\x00\x00\x13/dummyFolder/f1/f11/321.txt'
+/dummyFolder/f1/f12
+																10
+b'\x04007\x00\x00\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x0f/dummyFolder/f1'
+/dummyFolder/f2
+																11
+b'\x03007\x00\x00\x00\x12\x00\x00\x00\x00\x00\x00\x00\x00/home/itay/Desktop/Programming/IntroToNet/dummyFolder/f2/f1'
 
 
 ->OLD RESULTS (MESSAGES SENT FROM CLIENT TO SERVER)
