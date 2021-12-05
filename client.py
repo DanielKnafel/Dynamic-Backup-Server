@@ -10,17 +10,15 @@ import utils as u
 global g_id
 global g_main_folder
 global g_parent_folder
-global connect_info
-g_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-g_socket.settimeout(0.5)
-u.my_socket = g_socket
+global watch
+# g_socket.settimeout(0.5)
 
 
 def on_created(event):
-    #g_socket.connect(connect_info)
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     time.sleep(0.05)
+    u.connect()
     if os.path.exists(directory):
         if os.path.isfile(directory):
             u.send_file(directory, virtual_path, g_id)
@@ -29,25 +27,26 @@ def on_created(event):
     else:
         pass
         #print(f"--> Directory not exists: {directory}")
-    #g_socket.close()
+    u.communication_finished()
 
 
 def on_deleted(event):
-    #g_socket.connect(connect_info)
+    print("deleted")
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     dir_size = 0
     header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, g_id)
+    u.connect()
     u.send(header)
-    #g_socket.close()
+    u.communication_finished()
 
 
 def on_modified(event):
-    pass
+    print("modified")
 
 
 def on_moved(event):
-    #g_socket.connect(connect_info)
+    print("moved")
     src_path = "".join(event.src_path)
     dst_path = "".join(event.dest_path)
     virt_src_path = str(src_path).replace(g_parent_folder, '')
@@ -57,6 +56,7 @@ def on_moved(event):
     src_name = src_path.split("/")[-1]
     dst_name = dst_path.split("/")[-1]
     src_parent_folder = str(src_path).replace(src_name, '')
+    u.connect()
     # ignore all sub-dirs that moved
     if os.path.exists(src_parent_folder):
         if directory_moved(src_path, dst_path):
@@ -74,7 +74,7 @@ def on_moved(event):
         #print(f"hey {virt_src_path} your name is {dst_name}!\n\tyour father {src_parent_folder}\n\tis dead")
         pass
     time.sleep(0.05)
-    #g_socket.close()
+    u.communication_finished()
 
 
 def directory_moved(full_src_path, full_dst_path):
@@ -84,22 +84,22 @@ def directory_moved(full_src_path, full_dst_path):
 
 
 # **************MAIN************** #
-def read_from_buffer(parent_folder, s: socket.socket, ip: str, port: int):
-    s.connect(connect_info)
+def read_from_buffer(parent_folder):
     cmd = u.UPDT
     header = u.make_header(cmd, 0, 0, "", g_id)
+    u.connect()
     u.send(header)
     while cmd != b'':
-        cmd = s.recv(1)
-        path_len = int.from_bytes(s.recv(4), 'big')
-        data_len = int.from_bytes(s.recv(8), 'big')
-        path = s.recv(path_len)
+        cmd = u.my_socket.recv(1)
+        path_len = int.from_bytes(u.my_socket.recv(4), 'big')
+        data_len = int.from_bytes(u.my_socket.recv(8), 'big')
+        path = u.my_socket.recv(path_len)
         if cmd == u.NEWFI:
-            u.create_file(path, data_len, parent_folder, s)
+            u.create_file(path, data_len, parent_folder)
         elif cmd == u.CHNM:
-            u.change_name(path, data_len, parent_folder, s)
+            u.change_name(path, data_len, parent_folder)
         elif cmd == u.MOV:
-            u.move(path, data_len, parent_folder, s)
+            u.move(path, data_len, parent_folder)
         elif cmd == u.NEWFO:
             u.create_folder(path, parent_folder)
         elif cmd == u.DEL:
@@ -111,35 +111,30 @@ def read_from_buffer(parent_folder, s: socket.socket, ip: str, port: int):
             print(f"invalid cmd -{cmd}-")
             break
         time.sleep(0.005)
-    try:
-        s.close()
-    except:
-        pass
+    u.communication_finished()
 
 
-def activate(ip: str,
-             port: int,
-             waiting_time,
-             abs_path,
-             parent_folder,
-             s: socket.socket):
+def activate(waiting_time, abs_path, parent_folder):
     event_handler = PatternMatchingEventHandler("[*]")
     event_handler.on_created = on_created
     event_handler.on_deleted = on_deleted
     event_handler.on_modified = on_modified
     event_handler.on_moved = on_moved
 
+    global watch
+    watch = True
+
     my_observer = Observer()
     my_observer.schedule(event_handler, abs_path, recursive=True)
     my_observer.start()
     print(f"\n-> Watchdog Active(wait={waiting_time})...->")
-    for x in range(1, 120):
+    while True:
+        watch = False
         time.sleep(waiting_time)
-        #my_observer.stop()
-        #read_from_buffer(parent_folder, s, ip, port)
-        #my_observer.start()
-    my_observer.stop()
-    my_observer.join()
+        read_from_buffer(parent_folder)
+        watch = True
+    # my_observer.stop()
+    # my_observer.join()
 
 
 
@@ -159,28 +154,27 @@ if __name__ == "__main__":
         ancestors = dir_path.split('/')[0:-1]
         global g_parent_folder
         g_parent_folder = "/".join(ancestors)
-        global connect_info
-        connect_info = (dest_ip, dest_port)
+        u.connect_info = (dest_ip, dest_port)
 
         print(f"dir = {dir_path}")
-
-        #g_socket.connect(connect_info)
+        u.connect()
         if len(sys.argv) == 6:
+            print("have key")
             g_id = sys.argv[5]
             meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=g_id)
             u.send(meet_server)
             #ack = g_socket.recv(1)
         else:
+            print("no key")
             meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path)
             u.send(meet_server)
             #ack = g_socket.recv(1)
-            #global_id = g_socket.recv(128)
-            u.send_directory(bytes(dir_path, 'utf-8'), g_id, g_parent_folder)
-        #g_socket.close()
+            global_id = u.read_id()
+            print(f"got a key: {global_id}")
+            u.send_directory(dir_path, g_id, g_parent_folder)
+            u.send(u.FIN)
+        u.communication_finished()
 
-        activate(dest_ip,
-                 dest_port,
-                 duration,
+        activate(duration,
                  dir_path,
-                 g_parent_folder,
-                 g_socket)
+                 g_parent_folder)

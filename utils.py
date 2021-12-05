@@ -9,24 +9,32 @@ PATH_LEN_SIZE = 4
 FILE_SIZE = 8
 
 # commands
-ZERO = 0x00     # empty stuff
-NEWFO = 0x01    # new folder
-NEWFI = 0x02    # new file
-DEL = 0x03      # delete
-MOV = 0x04      # move from
-CHNM = 0x06     # change name of file / folder
-ACK = 0x0E      # ack
-FIN = 0x0F      # end of communication
-NID = 0x10      # no id
-EID = 0x11      # exiting id
-UPDT = 0x12      # client to server : update ME
+ZERO = 0x00.to_bytes(COMMAND_SIZE, 'big')     # empty stuff
+NEWFO = 0x01.to_bytes(COMMAND_SIZE, 'big')    # new folder
+NEWFI = 0x02.to_bytes(COMMAND_SIZE, 'big')    # new file
+DEL = 0x03.to_bytes(COMMAND_SIZE, 'big')      # delete
+MOV = 0x04.to_bytes(COMMAND_SIZE, 'big')      # move from
+CHNM = 0x06.to_bytes(COMMAND_SIZE, 'big')     # change name of file / folder
+ACK = 0x0E.to_bytes(COMMAND_SIZE, 'big')      # ack
+FIN = 0x0F.to_bytes(COMMAND_SIZE, 'big')      # end of communication
+NID = 0x10.to_bytes(COMMAND_SIZE, 'big')      # no id
+EID = 0x11.to_bytes(COMMAND_SIZE, 'big')      # exiting id
+UPDT = 0x12.to_bytes(COMMAND_SIZE, 'big')     # client to server : update ME
 MSS = 1e6
 
 SEP = os.sep
 my_socket: socket.socket
+connect_info : socket.AddressInfo
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
+def connect():
+    global my_socket
+    my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    my_socket.connect(connect_info)
+
+def read_id():
+    return my_socket.recv(KEY_SIZE)
 
 #tested 95%
 def create_folder(virtual_path, parent_folder):
@@ -39,14 +47,14 @@ def create_folder(virtual_path, parent_folder):
 
 
 #tested 95%
-def create_file(virtual_path, data_len, parent_folder, s: socket.socket):
+def create_file(virtual_path, data_len, parent_folder):
     data: bytes
     absolute_path = parent_folder + "/" + virtual_path
     data_remain = data_len
     with open(absolute_path, 'wb') as new_file:
         while data_remain > 0:
             read_limit = min(data_remain, MSS)
-            data = s.recv(read_limit)
+            data = my_socket.recv(read_limit)
             data_read = len(data)
             new_file.write(data)
             data_remain -= data_read
@@ -63,13 +71,13 @@ def delete_dir(abs_path):
                 delete_dir(os.path.join(abs_path, sub_dir))
             os.rmdir(abs_path)
     else:
-        pass
+        return False
+    return True
 
 # **************MOVING METHODS************** #
 
-
-def change_name(virt_src_path, name_len, parent_folder, s: socket.socket):
-    new_name = s.recv(name_len)
+def change_name(virt_src_path, name_len, parent_folder):
+    new_name = my_socket.recv(name_len)
     abs_path = parent_folder + "/" + virt_src_path
     if os.path.exists(abs_path):
         current_name = virt_src_path.split("/")[-1]
@@ -80,12 +88,13 @@ def change_name(virt_src_path, name_len, parent_folder, s: socket.socket):
         pass
 
 
-def move(virt_src_path, destination_len, parent_folder, s: socket.socket):
-    virt_dst_path = s.recv(destination_len)
+def move(virt_src_path, destination_len, parent_folder):
+    virt_dst_path = my_socket.recv(destination_len)
     if os.path.exists(parent_folder + "/" + virt_src_path):
         move_directory(virt_src_path, virt_dst_path, parent_folder)
     else:
         pass
+    return virt_dst_path
 
 
 # existence verification in move()
@@ -134,9 +143,9 @@ def move_directory(virt_src_path, virt_dst_path, parent_folder):
 # **************COMMUNICATION METHODS************** #
 
 
-def communication_finished(s: socket.socket):
+def communication_finished():
     print("finishing : closing socket")
-    s.close()
+    my_socket.close()
 
 
 def simulate_listen():
@@ -146,7 +155,7 @@ def simulate_listen():
 
 
 def send(data):
-    print(data)
+    print(f"sending: {data}")
     try:
         my_socket.send(data)
     except:
@@ -192,11 +201,11 @@ def make_header(cmd: int,
                 data_len: int,
                 path: str,
                 user_id=""):
-    message = cmd.to_bytes(1, 'big') + \
-              bytes(user_id, 'utf-8') + \
+    message = cmd + \
+              user_id.encode() + \
               path_len.to_bytes(4, 'big') +\
               data_len.to_bytes(8, 'big') +\
-              bytes(path, 'utf-8')
+              path.encode()
     return message
 
 
@@ -212,7 +221,6 @@ def send_file(abs_path, virtual_path, client_id=''):
         while file_data != b'':
             send(file_data)
             file_data = opened_file.read(int(MSS))
-
 
 def send_folder(abs_path, virtual_path, client_id=''):
     header = make_header(NEWFO, len(virtual_path), 0, virtual_path, client_id)
