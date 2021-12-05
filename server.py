@@ -4,36 +4,7 @@ import os
 import random
 import string
 import utils as u
-
-class Message:
-    cmd = 0x0
-    path_len = 0
-    data_len = 0
-    path = ''
-    data = ''
-
-    def __init__(self, cmd, path_len, data_len, path, data = ''):
-        self.cmd = cmd
-        self.path_len = path_len
-        self.data_len = data_len
-        self.path = path
-        self.data = data
-    
-    def send_message(self, clientID):
-        abs_path = os.path.join(clientID, self.path)
-        if self.cmd == u.NEWFI:
-            u.send_file(abs_path, self.path)
-        elif self.cmd == u.CHNM:
-            pass
-        elif self.cmd == u.MOV:
-            header = u.make_header(u.MOV, self.path_len, self.data_len, self.path, '')
-            u.send(header)
-            u.send(self.data)
-        elif self.cmd == u.NEWFO:
-            u.send_folder(abs_path, self.path)
-        elif self.cmd == u.DEL:
-            header = u.make_header(u.DEL, self.path_len, self.data_len, self.path)
-            u.send(header)
+from utils import Message
 
 class Client:
     key = ''
@@ -122,8 +93,8 @@ def handle_client(clientIP, client):
             u.create_folder(path, client.key)
             client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
         elif cmd == u.DEL:
-            if (u.delete_dir(os.path.join(client.key, path))):
-                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
+            u.delete_dir(os.path.join(client.key, path))
+            client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
         elif cmd == u.UPDT:
             client.send_messages_to(u.my_socket, clientIP)
             client.clear_messages(clientIP)

@@ -25,12 +25,49 @@ MSS = 1e6
 SEP = os.sep
 my_socket: socket.socket
 connect_info : socket.AddressInfo
+
+class Message:
+    cmd = 0x0
+    path_len = 0
+    data_len = 0
+    path = ''
+    data = ''
+
+    def __init__(self, cmd, path_len, data_len, path, data = ''):
+        self.cmd = cmd
+        self.path_len = path_len
+        self.data_len = data_len
+        self.path = path
+        self.data = data
+    
+    def equals(self, m):
+        return (self.cmd == m.cmd) and (self.path == m.path)
+
+
+    def send_message(self, clientID):
+        abs_path = os.path.join(clientID, self.path)
+        if self.cmd == NEWFI:
+            send_file(abs_path, self.path)
+        elif self.cmd == CHNM:
+            pass
+        elif self.cmd == MOV:
+            header = make_header(MOV, self.path_len, self.data_len, self.path, '')
+            send(header)
+            send(self.data)
+        elif self.cmd == NEWFO:
+            send_folder(abs_path, self.path)
+        elif self.cmd == DEL:
+            header = make_header(DEL, self.path_len, self.data_len, self.path)
+            send(header)
+
+
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
 def connect():
     global my_socket
     my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # my_socket.settimeout(0.1)
     my_socket.connect(connect_info)
 
 def read_id():
@@ -71,8 +108,7 @@ def delete_dir(abs_path):
                 delete_dir(os.path.join(abs_path, sub_dir))
             os.rmdir(abs_path)
     else:
-        return False
-    return True
+        pass
 
 # **************MOVING METHODS************** #
 
