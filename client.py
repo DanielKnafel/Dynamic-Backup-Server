@@ -43,6 +43,7 @@ def on_deleted(event):
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     if ignore_watchdog(u.DEL, virtual_path):
+        print("ignored")
         return
     dir_size = 0
     header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, g_id)
@@ -77,11 +78,11 @@ def on_moved(event):
             # in WD the dst contains also the name of the moved folder
             header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path, g_id)
             u.send(header)
-            u.send(virt_dst_path)
+            u.send(virt_dst_path.encode())
         else:
             header = u.make_header(u.CHNM, len(virt_src_path), len(dst_name), virt_src_path, g_id)
             u.send(header)
-            u.send(dst_name)
+            u.send(dst_name.encode())
     else:
         # it is a sub directory, his parent already moved
         #print(f"hey {virt_src_path} your name is {dst_name}!\n\tyour father {src_parent_folder}\n\tis dead")
@@ -104,6 +105,7 @@ def read_from_buffer(parent_folder):
     u.send(header)
     cmd = u.my_socket.recv(u.COMMAND_SIZE)
     while cmd != u.FIN:
+        print(f"cmd is: -{cmd}-")
         path_len = int.from_bytes(u.my_socket.recv(u.PATH_LEN_SIZE), 'big')
         data_len = int.from_bytes(u.my_socket.recv(u.FILE_SIZE), 'big')
         path = u.my_socket.recv(path_len)
@@ -138,8 +140,9 @@ def activate(waiting_time, abs_path, parent_folder):
     my_observer.start()
     print(f"\n-> Watchdog Active(wait={waiting_time})...->")
     while True:
-        time.sleep(waiting_time)
-        read_from_buffer(parent_folder)
+        pass
+    #     time.sleep(waiting_time)
+    #     read_from_buffer(parent_folder)
 
 
 if __name__ == "__main__":
@@ -170,12 +173,12 @@ if __name__ == "__main__":
             #ack = g_socket.recv(1)
         else:
             print("no key")
-            meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path)
+            meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path, '0' * u.KEY_SIZE)
             u.send(meet_server)
             #ack = g_socket.recv(1)
-            global_id = u.read_id()
-            print(f"got a key: {global_id}")
-            u.send_directory(dir_path, g_id, g_parent_folder)
+            g_id = u.my_socket.recv(u.KEY_SIZE).decode()
+            print(f"got a key: {g_id}")
+            u.send_directory(dir_path, g_main_folder, g_id)
         u.communication_finished()
 
         activate(duration,

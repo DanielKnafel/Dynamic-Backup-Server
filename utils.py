@@ -70,9 +70,6 @@ def connect():
     # my_socket.settimeout(0.1)
     my_socket.connect(connect_info)
 
-def read_id():
-    return my_socket.recv(KEY_SIZE)
-
 #tested 95%
 def create_folder(virtual_path, parent_folder):
     absolute_path = parent_folder + "/" + virtual_path
@@ -113,19 +110,19 @@ def delete_dir(abs_path):
 # **************MOVING METHODS************** #
 
 def change_name(virt_src_path, name_len, parent_folder):
-    new_name = my_socket.recv(name_len)
-    abs_path = parent_folder + "/" + virt_src_path
+    new_name = my_socket.recv(name_len).decode()
+    abs_path = os.path.join(parent_folder, virt_src_path)
     if os.path.exists(abs_path):
-        current_name = virt_src_path.split("/")[-1]
-        path = virt_src_path.split("/")[0:-1]
-        os.chdir(path)
-        os.rename(current_name, new_name)
+        # get parent folders
+        path = abs_path.split("/")[0:-1]
+        path = "/".join(path)
+        new_name = os.path.join(path, new_name)
+        os.rename(abs_path, new_name)
     else:
         pass
 
-
 def move(virt_src_path, destination_len, parent_folder):
-    virt_dst_path = my_socket.recv(destination_len)
+    virt_dst_path = my_socket.recv(destination_len).decode()
     if os.path.exists(parent_folder + "/" + virt_src_path):
         move_directory(virt_src_path, virt_dst_path, parent_folder)
     else:
@@ -232,7 +229,7 @@ def send(data):
 
 
 # **************NOTIFY METHODS************** #
-def make_header(cmd: int,
+def make_header(cmd: bytes,
                 path_len: int,
                 data_len: int,
                 path: str,
@@ -246,7 +243,7 @@ def make_header(cmd: int,
 
 
 def send_file(abs_path, virtual_path, client_id=''):
-    # print(f"send file {abs_path}")
+    # print(f"send v_file {virtual_path}")
     header = make_header(NEWFI, len(virtual_path), os.path.getsize(abs_path), virtual_path, client_id)
     send(header)
 

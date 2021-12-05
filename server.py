@@ -40,30 +40,26 @@ def generate_key():
     key = ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=u.KEY_SIZE))
     return key
 
-def create_main_client_dir(clientKey):
-    print(f"creating dir {clientKey}")
-    os.mkdir(clientKey)
+def create_main_client_dir(client_key, main_folder):
+    print(f"creating dir {client_key}")
+    os.makedirs(os.path.join(client_key,main_folder))
 
-def handle_new_client(clientIP):
+def handle_new_client(clientIP, path_len, path):
     print("client has no ID")
     key = generate_key()
     u.my_socket.send(key.encode())
-    create_main_client_dir(key)
-    pathLen = int.from_bytes(u.my_socket.recv(u.PATH_LEN_SIZE), 'big')
-    print(f"path len is: {pathLen}")
-    data_len = u.my_socket.recv(u.FILE_SIZE)
-    path = u.my_socket.recv(pathLen)
-    print(f"path is: {path.decode()}")
-    client = Client(key, path.decode())
+    create_main_client_dir(key, path)
+    print(f"path len is: {path_len}")
+    print(f"path is: {path}")
+    client = Client(key, path)
     client.add_device(clientIP)
     clients[key] = client
     return client
  
 # Existing Client Handeling #
 
-def handle_existing_client(clientIP):
+def handle_existing_client(clientIP, key):
     print("client has an ID")
-    key = u.my_socket.recv(u.KEY_SIZE).decode()
     try:
         client = clients[key]
         client.addDevice(clientIP)
@@ -72,46 +68,58 @@ def handle_existing_client(clientIP):
         print("no such client")
 
 # start reading commands
-def handle_client(clientIP, client):
-    cmd = 0
-    while cmd != u.FIN:
-        cmd = u.my_socket.recv(u.COMMAND_SIZE)
+def handle_client(clientIP):
+    cmd = u.my_socket.recv(u.COMMAND_SIZE)
+    client = None
+
+    while cmd != b'':
+        print(f"cmd is: -{cmd}-")
+        key = u.my_socket.recv(u.KEY_SIZE).decode()
         path_len = int.from_bytes(u.my_socket.recv(u.PATH_LEN_SIZE), 'big')
         data_len = int.from_bytes(u.my_socket.recv(u.FILE_SIZE), 'big')
         path = u.my_socket.recv(path_len).decode()
-        if cmd == u.NEWFI:
-            u.create_file(path, data_len, client.key, u.my_socket)
-            client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-        elif cmd == u.CHNM:
-            u.change_name(path, data_len, client.key, u.my_socket)
-            client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-        elif cmd == u.MOV:
-            # returns the dst path
-            dst_path = u.move(path, data_len, client.key, u.my_socket)
-            client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path, dst_path))
-        elif cmd == u.NEWFO:
-            u.create_folder(path, client.key)
-            client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-        elif cmd == u.DEL:
-            u.delete_dir(os.path.join(client.key, path))
-            client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-        elif cmd == u.UPDT:
-            client.send_messages_to(u.my_socket, clientIP)
-            client.clear_messages(clientIP)
-        elif cmd == u.FIN:
-            u.communication_finished()
+        print(f"got: \t key: {key}\n\t cmd: {cmd} \n\t path: {path}")
+        if cmd == u.EID: # client has an ID
+            client = handle_existing_client(clientIP, key)
+        elif cmd == u.NID:
+            client = handle_new_client(clientIP, path_len, path)
         else:
-            print(f"invalid cmd -{cmd}-")
+            client = clients[key]
+            if cmd == u.NEWFI:
+                u.create_file(path, data_len, client.key)
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
+            elif cmd == u.CHNM:
+                u.change_name(path, data_len, client.key)
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
+            elif cmd == u.MOV:
+                # returns the dst path
+                dst_path = u.move(path, data_len, client.key)
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path, dst_path))
+            elif cmd == u.NEWFO:
+                u.create_folder(path, client.key)
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
+            elif cmd == u.DEL:
+                abs_path = os.path.join(client.key, path)
+                u.delete_dir(abs_path)
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
+            elif cmd == u.UPDT:
+                client = clients[key]
+                client.send_messages_to(u.my_socket, clientIP)
+                client.clear_messages(clientIP)
+                u.send(u.FIN)
+            else:
+                print(f"invalid cmd -{cmd}-")
+        cmd = u.my_socket.recv(u.COMMAND_SIZE)
 
 def accept_client(clientIP):
-    cmd = u.my_socket.recv(u.COMMAND_SIZE)
     client = None
+    cmd = u.my_socket.recv(u.COMMAND_SIZE)
     if cmd == u.EID: # client has an ID
         client = handle_existing_client(clientIP)
     elif cmd == u.NID:
         client = handle_new_client(clientIP)
     return client
-    
+
 def start_server(port):
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSocket.bind(("", port))
@@ -119,12 +127,11 @@ def start_server(port):
     while True:
         print("waiting for client")
         u.my_socket, clientAddress = serverSocket.accept()
-        clientIP = clientAddress[0]
-        accept_client(clientIP)
         print(f"client {clientAddress} connected")
+        clientIP = clientAddress[0]
         handle_client(clientIP)
         print(f"client {clientAddress} dissconnected")
-        u.my_socket.close()
+        u.communication_finished()
 
 def main():
     if len(sys.argv) < 2:
