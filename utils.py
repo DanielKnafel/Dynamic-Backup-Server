@@ -72,7 +72,7 @@ def connect():
 
 #tested 95%
 def create_folder(virtual_path, parent_folder):
-    absolute_path = parent_folder + "/" + virtual_path
+    absolute_path = os.path.join(parent_folder, virtual_path)
     # os.chmod(os.path.join(parent_folder, "dummyFolder"), mode=0o777)
     if not os.path.exists(absolute_path):
         print(f"trying to create folder named {virtual_path} on {parent_folder}")
@@ -83,7 +83,7 @@ def create_folder(virtual_path, parent_folder):
 #tested 95%
 def create_file(virtual_path, data_len, parent_folder):
     data: bytes
-    absolute_path = parent_folder + "/" + virtual_path
+    absolute_path = os.path.join(parent_folder, virtual_path)
     data_remain = data_len
     with open(absolute_path, 'wb') as new_file:
         while data_remain > 0:
@@ -123,7 +123,7 @@ def change_name(virt_src_path, name_len, parent_folder):
 
 def move(virt_src_path, destination_len, parent_folder):
     virt_dst_path = my_socket.recv(destination_len).decode()
-    if os.path.exists(parent_folder + "/" + virt_src_path):
+    if os.path.exists(os.path.join(parent_folder, virt_src_path)):
         move_directory(virt_src_path, virt_dst_path, parent_folder)
     else:
         pass
@@ -132,8 +132,8 @@ def move(virt_src_path, destination_len, parent_folder):
 
 # existence verification in move()
 def move_file(file_name, virt_src_path, virt_dst_path, parent_folder):
-    abs_src_path = parent_folder + "/" + virt_src_path + "/" + file_name
-    abs_dst_path = parent_folder + "/" + virt_dst_path + "/" + file_name
+    abs_src_path = os.path.join(parent_folder, virt_src_path, file_name)
+    abs_dst_path = os.path.join(parent_folder, virt_dst_path, file_name)
     if os.path.exists(abs_src_path):
         with open(abs_src_path, 'rb') as original_file:
             with open(abs_dst_path, 'wb') as new_file:
@@ -148,16 +148,15 @@ def move_file(file_name, virt_src_path, virt_dst_path, parent_folder):
 
 # existence verification in move()
 def move_directory(virt_src_path, virt_dst_path, parent_folder):
-    if os.path.isfile(parent_folder + "/" + virt_src_path):
+    if os.path.isfile(os.path.join(parent_folder, virt_src_path)):
         file_name = virt_src_path.split("/")[-1]
         print(f"moving file {file_name} from directory " + virt_src_path)
         move_file(file_name, virt_src_path, virt_dst_path, parent_folder)
     else:
         folder_name = virt_src_path.split("/")[-1]
         print(f"moving folder {folder_name} from directory " + virt_src_path)
-        abs_src_path = parent_folder + "/" + virt_src_path
-        # abs_dst_path = parent_folder + "/" + virt_dst_path
-        virt_dst_path = virt_dst_path + "/" + folder_name
+        abs_src_path = os.path.join(parent_folder, virt_src_path)
+        virt_dst_path = os.path.join(virt_dst_path, folder_name)
         create_folder(virt_dst_path, parent_folder)
         for file_name in os.listdir(abs_src_path):
             if os.path.isfile(os.path.join(abs_src_path, file_name)):
@@ -166,7 +165,7 @@ def move_directory(virt_src_path, virt_dst_path, parent_folder):
                 move_file(file_name, virt_src_path, virt_dst_path, parent_folder)
         for sub_dir in os.listdir(abs_src_path):
             if not os.path.isfile(os.path.join(abs_src_path, sub_dir)):
-                sub_virt_src_path = virt_src_path + "/" + sub_dir
+                sub_virt_src_path = os.path.join(virt_src_path, sub_dir)
                 print(f"going to folder {sub_virt_src_path}")
                 move_directory(sub_virt_src_path, virt_dst_path, parent_folder)
         print("deleting folder " + virt_src_path)

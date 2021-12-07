@@ -23,7 +23,7 @@ def ignore_watchdog(cmd, src_path):
 def on_created(event):
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
-    if ignore_watchdog(u.NEWFI, virtual_path) or ignore_watchdog(u.NEWFO, virtual_path):
+    if ignore_watchdog(u.NEWFI, virtual_path):
         return
     time.sleep(0.05)
     u.connect()
@@ -53,10 +53,19 @@ def on_deleted(event):
 
 
 def on_modified(event):
-    # if ignore_watchdog(u.NEWFI, virtual_path) or ignore_watchdog(u.NEWFO, virtual_path):
-        
+    directory = event.src_path
+    virtual_path = str(directory).replace(g_parent_folder, '')
+    if ignore_watchdog(u.NEWFI, virtual_path):
+        print("ignored")
+        return
+    if event.is_directory:
+        return None
     print("modified")
-
+    time.sleep(0.05)
+    if os.path.exists(event.src_path):
+        u.connect()
+        u.send_file(directory, virtual_path, g_id)
+        u.communication_finished()
 
 def on_moved(event):
     print("moved")
@@ -99,16 +108,13 @@ def directory_moved(full_src_path, full_dst_path):
 
 # **************MAIN************** #
 def read_from_buffer(parent_folder):
-    cmd = u.UPDT
-    header = u.make_header(cmd, 0, 0, "", g_id)
-    u.connect()
-    u.send(header)
     cmd = u.my_socket.recv(u.COMMAND_SIZE)
     while cmd != u.FIN:
-        print(f"cmd is: -{cmd}-")
         path_len = int.from_bytes(u.my_socket.recv(u.PATH_LEN_SIZE), 'big')
         data_len = int.from_bytes(u.my_socket.recv(u.FILE_SIZE), 'big')
-        path = u.my_socket.recv(path_len)
+        path = u.my_socket.recv(path_len).decode()
+        print(f"got: \t cmd: {cmd} \n\t data_len: {data_len} \n\t path: {path}")
+        to_do_list.append(u.Message(cmd, path_len, data_len, path))
         if cmd == u.NEWFI:
             u.create_file(path, data_len, parent_folder)
         elif cmd == u.CHNM:
@@ -118,14 +124,13 @@ def read_from_buffer(parent_folder):
         elif cmd == u.NEWFO:
             u.create_folder(path, parent_folder)
         elif cmd == u.DEL:
-            u.delete_dir(parent_folder + "/" + path)
+            u.delete_dir(os.path.join(parent_folder, path))
         else:
             print(f"invalid cmd -{cmd}-")
             break
-        to_do_list.append(u.Message(cmd, path_len, data_len, path))
         time.sleep(0.005)
         cmd = u.my_socket.recv(u.COMMAND_SIZE)
-    u.communication_finished()
+    to_do_list.clear()
 
 
 def activate(waiting_time, abs_path, parent_folder):
@@ -140,9 +145,14 @@ def activate(waiting_time, abs_path, parent_folder):
     my_observer.start()
     print(f"\n-> Watchdog Active(wait={waiting_time})...->")
     while True:
-        pass
-    #     time.sleep(waiting_time)
-    #     read_from_buffer(parent_folder)
+        cmd = u.UPDT
+        header = u.make_header(cmd, 0, 0, "", g_id)
+        u.connect()
+        u.send(header)
+        time.sleep(waiting_time)
+        read_from_buffer(parent_folder)
+        u.communication_finished()
+
 
 
 if __name__ == "__main__":
@@ -170,12 +180,11 @@ if __name__ == "__main__":
             g_id = sys.argv[5]
             meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=g_id)
             u.send(meet_server)
-            #ack = g_socket.recv(1)
+            read_from_buffer(g_parent_folder)
         else:
             print("no key")
             meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path, '0' * u.KEY_SIZE)
             u.send(meet_server)
-            #ack = g_socket.recv(1)
             g_id = u.my_socket.recv(u.KEY_SIZE).decode()
             print(f"got a key: {g_id}")
             u.send_directory(dir_path, g_main_folder, g_id)
