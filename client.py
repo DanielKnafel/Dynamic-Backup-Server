@@ -3,7 +3,7 @@ import socket
 import os
 import time
 from watchdog.observers import Observer
-from watchdog.events import PatternMatchingEventHandler
+from watchdog.events import PatternMatchingEventHandler, FileDeletedEvent, FileCreatedEvent, DirCreatedEvent, DirDeletedEvent
 import utils as u
 
 
@@ -13,10 +13,11 @@ global g_parent_folder
 global to_do_list
 to_do_list = []
 
+# check if an event should be ignored by watchdog
 def ignore_watchdog(cmd, src_path):
     m = u.Message(cmd, len(src_path), 0, src_path)
     for message in to_do_list:
-        if (message.eqauls(m)):
+        if (message.equals(m)):
             return True
     return False
 
@@ -26,99 +27,77 @@ def on_created(event):
     if ignore_watchdog(u.NEWFI, virtual_path):
         return
     time.sleep(0.05)
-    u.connect()
+    s = u.connect()
     if os.path.exists(directory):
         if os.path.isfile(directory):
-            u.send_file(directory, virtual_path, g_id)
+            u.send_file(s, directory, virtual_path, g_id)
         else:
-            u.send_folder(directory, virtual_path, g_id)
+            u.send_folder(s, directory, virtual_path, g_id)
     else:
         pass
         #print(f"--> Directory not exists: {directory}")
-    u.communication_finished()
+    s.close()
 
 
 def on_deleted(event):
-    print("deleted")
+    # print("deleted")
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     if ignore_watchdog(u.DEL, virtual_path):
-        print("ignored")
+        # print("ignored")
         return
     dir_size = 0
     header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, g_id)
-    u.connect()
-    u.send(header)
-    u.communication_finished()
+    s = u.connect()
+    s.send(header)
+    s.close()
 
 
 def on_modified(event):
     directory = event.src_path
     virtual_path = str(directory).replace(g_parent_folder, '')
     if ignore_watchdog(u.NEWFI, virtual_path):
-        print("ignored")
+        # print("ignored")
         return
     if event.is_directory:
         return None
-    print("modified")
+    # print("modified")
     time.sleep(0.05)
     if os.path.exists(event.src_path):
-        u.connect()
-        u.send_file(directory, virtual_path, g_id)
-        u.communication_finished()
+        s = u.connect()
+        u.send_file(s, directory, virtual_path, g_id)
+        s.close()
 
 def on_moved(event):
-    print("moved")
-    src_path = "".join(event.src_path)
-    dst_path = "".join(event.dest_path)
-    virt_src_path = str(src_path).replace(g_parent_folder, '')
-    virt_dst_path = str(dst_path).replace(g_parent_folder, '')
-    #print(f"---> WD src_path= {src_path}\n\tdst_path= {dst_path}")
-    if ignore_watchdog(u.MOV, virt_src_path) or ignore_watchdog(u.CHNM, virt_src_path):
-        return
-    src_name = src_path.split("/")[-1]
-    dst_name = dst_path.split("/")[-1]
-    src_parent_folder = str(src_path).replace(src_name, '')
-    u.connect()
-    # ignore all sub-dirs that moved
-    if os.path.exists(src_parent_folder):
-        if directory_moved(src_path, dst_path):
-            virt_dst_path = virt_dst_path.replace("/" + dst_name, '')
-            # in WD the dst contains also the name of the moved folder
-            header = u.make_header(u.MOV, len(virt_src_path), len(virt_dst_path), virt_src_path, g_id)
-            u.send(header)
-            u.send(virt_dst_path.encode())
-        else:
-            header = u.make_header(u.CHNM, len(virt_src_path), len(dst_name), virt_src_path, g_id)
-            u.send(header)
-            u.send(dst_name.encode())
+    # print("moved")   
+    delete_event = None
+    create_event = None
+
+    if event.is_directory:
+        delete_event = DirDeletedEvent(event.src_path)
+        create_event = DirCreatedEvent(event.dest_path)
     else:
-        # it is a sub directory, his parent already moved
-        #print(f"hey {virt_src_path} your name is {dst_name}!\n\tyour father {src_parent_folder}\n\tis dead")
-        pass
-    time.sleep(0.05)
-    u.communication_finished()
+        delete_event = FileDeletedEvent(event.src_path)
+        create_event = FileCreatedEvent(event.dest_path)
+    on_deleted(delete_event)
+    on_created(create_event)
 
-
-def directory_moved(full_src_path, full_dst_path):
-    src_parent = full_src_path.split("/")[0:-1]
-    dst_parent = full_dst_path.split("/")[0:-1]
-    return src_parent != dst_parent
-
+# read the protocol header
+def readHeader(s):
+    path_len = int.from_bytes(s.recv(u.PATH_LEN_SIZE), 'big')
+    data_len = int.from_bytes(s.recv(u.FILE_SIZE), 'big')
+    path = s.recv(path_len).decode()
+    return path_len, data_len, path
 
 # **************MAIN************** #
-def read_from_buffer(parent_folder):
-    cmd = u.my_socket.recv(u.COMMAND_SIZE)
+def read_from_buffer(s, parent_folder):
+    cmd = s.recv(u.COMMAND_SIZE)
     while cmd != u.FIN:
-        path_len = int.from_bytes(u.my_socket.recv(u.PATH_LEN_SIZE), 'big')
-        data_len = int.from_bytes(u.my_socket.recv(u.FILE_SIZE), 'big')
-        path = u.my_socket.recv(path_len).decode()
-        print(f"got: \t cmd: {cmd} \n\t data_len: {data_len} \n\t path: {path}")
+        path_len, data_len, path = readHeader(s)
+        # print(f"got: \t cmd: {cmd} \n\t data_len: {data_len} \n\t path: {path}")
         to_do_list.append(u.Message(cmd, path_len, data_len, path))
         if cmd == u.NEWFI:
-            u.create_file(path, data_len, parent_folder)
-        elif cmd == u.CHNM:
-            u.change_name(path, data_len, parent_folder)
+            u.create_file(s, path, data_len, parent_folder)
         elif cmd == u.MOV:
             u.move(path, data_len, parent_folder)
         elif cmd == u.NEWFO:
@@ -126,10 +105,10 @@ def read_from_buffer(parent_folder):
         elif cmd == u.DEL:
             u.delete_dir(os.path.join(parent_folder, path))
         else:
-            print(f"invalid cmd -{cmd}-")
+            # print(f"invalid cmd -{cmd}-")
             break
         time.sleep(0.005)
-        cmd = u.my_socket.recv(u.COMMAND_SIZE)
+        cmd = s.recv(u.COMMAND_SIZE)
     to_do_list.clear()
 
 
@@ -143,20 +122,20 @@ def activate(waiting_time, abs_path, parent_folder):
     my_observer = Observer()
     my_observer.schedule(event_handler, abs_path, recursive=True)
     my_observer.start()
-    print(f"\n-> Watchdog Active(wait={waiting_time})...->")
+    # print(f"\n-> Watchdog Active(wait={waiting_time})...->")
     while True:
+        time.sleep(waiting_time)
         cmd = u.UPDT
         header = u.make_header(cmd, 0, 0, "", g_id)
-        u.connect()
-        u.send(header)
-        time.sleep(waiting_time)
-        read_from_buffer(parent_folder)
-        u.communication_finished()
+        s = u.connect()
+        s.send(header)
+        read_from_buffer(s, parent_folder)
+        s.close()
 
 
 
 if __name__ == "__main__":
-    print("\nClient Active...->")
+    # print("\nClient Active...->")
     dest_ip = dir_path = my_id = ""
     dest_port = duration = 0
     if len(sys.argv) < 5:
@@ -173,22 +152,22 @@ if __name__ == "__main__":
         g_parent_folder = "/".join(ancestors)
         u.connect_info = (dest_ip, dest_port)
 
-        print(f"dir = {dir_path}")
-        u.connect()
+        # print(f"dir = {dir_path}")
+        s = u.connect()
         if len(sys.argv) == 6:
-            print("have key")
+            # print("have key")
             g_id = sys.argv[5]
             meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=g_id)
-            u.send(meet_server)
+            s.send(meet_server)
             read_from_buffer(g_parent_folder)
         else:
-            print("no key")
+            # print("no key")
             meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path, '0' * u.KEY_SIZE)
-            u.send(meet_server)
-            g_id = u.my_socket.recv(u.KEY_SIZE).decode()
-            print(f"got a key: {g_id}")
-            u.send_directory(dir_path, g_main_folder, g_id)
-        u.communication_finished()
+            s.send(meet_server)
+            g_id = s.recv(u.KEY_SIZE).decode()
+            # print(f"got a key: {g_id}")
+            u.send_directory(s, dir_path, g_main_folder, g_id)
+        s.close()
 
         activate(duration,
                  dir_path,
