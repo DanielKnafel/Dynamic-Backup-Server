@@ -2,6 +2,24 @@ import os
 import socket
 import time
 
+# ------------------------------------------------------------------------------------- #
+#                                  PROTOCOL                                             #
+# Client side:                                                                          #
+#   (*) First message from client to server:                                            #
+#          1. client has no ID - send NID flagm recieve ID from server and send folder. #
+#          2. client has an ID - send EID flag and recieve the folder.                  #
+#   (*) The protocol header consists of (size in bytes):                                #
+#         [CMD(1)][ID(128)][PATH_LEN(4)][DATA_LEN(8)]                                   #
+#   (*) Immidietly send any changes in the client's directory to server.                #
+#   (*) Establish a new connection for each message, and close it afterwards.           #
+#   (*) Each connection to server includes only one update message.                     #
+#   (*) Each time the client informs the server about a change, it also requests to     #
+#       recieve updates from other PC's by sending the flag UPDT.                       #
+# Server side:                                                                          #
+#   (*) Server keeps a list of all client's PCs and saves a list of updates for each.   #
+#   (*) Server sends all updates over one connection, and sends FIN afterwards.         #
+# ------------------------------------------------------------------------------------- #
+
 # coded sizes in bytes
 KEY_SIZE = 128
 COMMAND_SIZE = 1
@@ -9,20 +27,15 @@ PATH_LEN_SIZE = 4
 FILE_SIZE = 8
 
 # commands
-ZERO = 0x00.to_bytes(COMMAND_SIZE, 'big')     # empty stuff
 NEWFO = 0x01.to_bytes(COMMAND_SIZE, 'big')    # new folder
 NEWFI = 0x02.to_bytes(COMMAND_SIZE, 'big')    # new file
 DEL = 0x03.to_bytes(COMMAND_SIZE, 'big')      # delete
-MOV = 0x04.to_bytes(COMMAND_SIZE, 'big')      # move from
-CHNM = 0x06.to_bytes(COMMAND_SIZE, 'big')     # change name of file / folder
-ACK = 0x0E.to_bytes(COMMAND_SIZE, 'big')      # ack
 FIN = 0x0F.to_bytes(COMMAND_SIZE, 'big')      # end of communication
 NID = 0x10.to_bytes(COMMAND_SIZE, 'big')      # no id
 EID = 0x11.to_bytes(COMMAND_SIZE, 'big')      # exiting id
 UPDT = 0x12.to_bytes(COMMAND_SIZE, 'big')     # client to server : update ME
 MSS = 1e6
 
-SEP = os.sep
 my_socket: socket.socket
 connect_info : socket.AddressInfo
 
@@ -54,14 +67,13 @@ class Message:
             header = make_header(DEL, self.path_len, self.data_len, self.path)
             send(header)
 
-
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
 def connect():
-    my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    my_socket.connect(connect_info)
-    return my_socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(connect_info)
+    return s
 
 def send(data):
     try:
@@ -110,58 +122,8 @@ def delete_dir(abs_path):
     else:
         pass
 
-# **************MOVING METHODS************** #
-def move(virt_src_path, destination_len, parent_folder):
-    virt_dst_path = my_socket.recv(destination_len).decode()
-    if os.path.exists(os.path.join(parent_folder, virt_src_path)):
-        move_directory(virt_src_path, virt_dst_path, parent_folder)
-    else:
-        pass
-    return virt_dst_path
-
-
-# existence verification in move()
-def move_file(file_name, virt_src_path, virt_dst_path, parent_folder):
-    abs_src_path = os.path.join(parent_folder, virt_src_path, file_name)
-    abs_dst_path = os.path.join(parent_folder, virt_dst_path, file_name)
-    if os.path.exists(abs_src_path):
-        with open(abs_src_path, 'rb') as original_file:
-            with open(abs_dst_path, 'wb') as new_file:
-                file_data = original_file.read(int(MSS))
-                while file_data != b'':
-                    new_file.write(file_data)
-                    file_data = original_file.read(int(MSS))
-        delete_dir(abs_src_path)
-    else:
-        pass
-
-
-# existence verification in move()
-def move_directory(virt_src_path, virt_dst_path, parent_folder):
-    if os.path.isfile(os.path.join(parent_folder, virt_src_path)):
-        file_name = virt_src_path.split("/")[-1]
-        # print(f"moving file {file_name} from directory " + virt_src_path)
-        move_file(file_name, virt_src_path, virt_dst_path, parent_folder)
-    else:
-        folder_name = virt_src_path.split("/")[-1]
-        # print(f"moving folder {folder_name} from directory " + virt_src_path)
-        abs_src_path = os.path.join(parent_folder, virt_src_path)
-        virt_dst_path = os.path.join(virt_dst_path, folder_name)
-        create_folder(virt_dst_path, parent_folder)
-        for file_name in os.listdir(abs_src_path):
-            if os.path.isfile(os.path.join(abs_src_path, file_name)):
-                # print("moving file " + file_name + " from " + virt_src_path)
-                # for file_name in files:
-                move_file(file_name, virt_src_path, virt_dst_path, parent_folder)
-        for sub_dir in os.listdir(abs_src_path):
-            if not os.path.isfile(os.path.join(abs_src_path, sub_dir)):
-                sub_virt_src_path = os.path.join(virt_src_path, sub_dir)
-                # print(f"going to folder {sub_virt_src_path}")
-                move_directory(sub_virt_src_path, virt_dst_path, parent_folder)
-        # print("deleting folder " + virt_src_path)
-        delete_dir(abs_src_path)
-
 # **************NOTIFY METHODS************** #
+# create protocol header
 def make_header(cmd: bytes,
                 path_len: int,
                 data_len: int,
@@ -174,7 +136,7 @@ def make_header(cmd: bytes,
               path.encode()
     return message
 
-
+# use socket s to send file from a given path
 def send_file(s, abs_path, virtual_path, client_id=''):
     # print(f"send v_file {virtual_path}")
     header = make_header(NEWFI, len(virtual_path), os.path.getsize(abs_path), virtual_path, client_id)
@@ -188,6 +150,7 @@ def send_file(s, abs_path, virtual_path, client_id=''):
             s.send(file_data)
             file_data = opened_file.read(int(MSS))
 
+# use socket s to send a folder, including its sub-dirs and files
 def send_folder(s, abs_path, virtual_path, client_id=''):
     header = make_header(NEWFO, len(virtual_path), 0, virtual_path, client_id)
     s.send(header)
@@ -206,7 +169,7 @@ def send_folder(s, abs_path, virtual_path, client_id=''):
                         os.path.join(virtual_path, sub_dir),
                         client_id)
 
-
+# use socket s to send a folder, including its sub-dirs and files
 def send_directory(s, path, main_folder, client_id=''):
     # Request for creating main folder already done in main()
     # Send files

@@ -93,11 +93,13 @@ def readHeader(s):
     return path_len, data_len, path
 
 # **************MAIN************** #
+# ask server for relevant updates
 def request_updates(s, parent_folder):
     header = u.make_header(u.UPDT, 0, 0, "", g_id)
     s.send(header)
     read_from_buffer(s, parent_folder)
 
+# recieve updates from server
 def read_from_buffer(s, parent_folder):
     cmd = s.recv(u.COMMAND_SIZE)
     while cmd != u.FIN:
@@ -106,8 +108,6 @@ def read_from_buffer(s, parent_folder):
         to_do_list.append(u.Message(cmd, path_len, data_len, path))
         if cmd == u.NEWFI:
             u.create_file(s, path, data_len, parent_folder)
-        elif cmd == u.MOV:
-            u.move(path, data_len, parent_folder)
         elif cmd == u.NEWFO:
             u.create_folder(path, parent_folder)
         elif cmd == u.DEL:
@@ -119,7 +119,7 @@ def read_from_buffer(s, parent_folder):
         cmd = s.recv(u.COMMAND_SIZE)
     to_do_list.clear()
 
-
+# start watchdog 
 def activate(waiting_time, abs_path, parent_folder):
     event_handler = PatternMatchingEventHandler("[*]")
     event_handler.on_created = on_created
@@ -131,12 +131,12 @@ def activate(waiting_time, abs_path, parent_folder):
     my_observer.schedule(event_handler, abs_path, recursive=True)
     my_observer.start()
     # print(f"\n-> Watchdog Active(wait={waiting_time})...->")
+    # update request loop
     while True:
         time.sleep(waiting_time)
         s = u.connect()
         request_updates(s, parent_folder)
         s.close()
-
 
 
 if __name__ == "__main__":
@@ -164,7 +164,11 @@ if __name__ == "__main__":
             g_id = sys.argv[5]
             meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=g_id)
             s.send(meet_server)
-            read_from_buffer(s, g_parent_folder)
+            path_len = int.from_bytes(s.recv(u.PATH_LEN_SIZE), 'big')
+            virt_path = s.recv(path_len).decode()
+            g_parent_folder = dir_path
+            dir_path = os.path.join(dir_path, virt_path)
+            read_from_buffer(s)
         else:
             # print("no key")
             meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path, '0' * u.KEY_SIZE)
