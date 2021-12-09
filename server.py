@@ -106,7 +106,7 @@ def handle_client(clientIP):
 
     while cmd != b'':
         key, path_len, data_len, path = readHeader()
-        # print(f"got: \t key: {key}\n\t cmd: {cmd} \n\t path: {path}")
+        # print(f"got: \t key: {key}\n\t cmd: {cmd} \n\t path: {path} \n\t from {clientIP}")
         if cmd == u.EID:  # client has an ID
             handle_existing_client(clientIP, key)
             return

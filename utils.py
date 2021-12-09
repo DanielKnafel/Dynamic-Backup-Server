@@ -59,6 +59,7 @@ class Message:
 
     def send_message(self, clientID):
         abs_path = os.path.join(clientID, self.path)
+        # print(f" sending message: cmd:{self.cmd}, path: {self.path}")
         if self.cmd == NEWFI:
             send_file(my_socket, abs_path, self.path)
         elif self.cmd == NEWFO:
