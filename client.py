@@ -8,7 +8,6 @@ import utils as u
 
 
 global g_id
-global g_main_folder
 global g_parent_folder
 global to_do_list
 to_do_list = []
@@ -150,8 +149,7 @@ if __name__ == "__main__":
         dest_ip, dest_port, dir_path, duration = sys.argv[1], int(sys.argv[2]), sys.argv[3], float(sys.argv[4])
         global g_id
         g_id = my_id
-        global g_main_folder
-        g_main_folder = dir_path.split('/')[-1]
+        main_folder = dir_path.split('/')[-1]
         ancestors = dir_path.split('/')[0:-1]
         global g_parent_folder
         g_parent_folder = "/".join(ancestors)
@@ -165,17 +163,17 @@ if __name__ == "__main__":
             meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=g_id)
             s.send(meet_server)
             path_len = int.from_bytes(s.recv(u.PATH_LEN_SIZE), 'big')
-            virt_path = s.recv(path_len).decode()
+            main_folder = s.recv(path_len).decode()
             g_parent_folder = dir_path
-            dir_path = os.path.join(dir_path, virt_path)
-            read_from_buffer(s)
+            dir_path = os.path.join(dir_path, main_folder)
+            read_from_buffer(s, g_parent_folder)
         else:
             # print("no key")
             meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path, '0' * u.KEY_SIZE)
             s.send(meet_server)
             g_id = s.recv(u.KEY_SIZE).decode()
             # print(f"got a key: {g_id}")
-            u.send_directory(s, dir_path, g_main_folder, g_id)
+            u.send_directory(s, dir_path, main_folder, g_id)
         s.close()
 
         activate(duration,

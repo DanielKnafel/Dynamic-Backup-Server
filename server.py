@@ -6,6 +6,7 @@ import string
 import utils as u
 from utils import Message
 
+
 class Client:
     key = ''
     mainDirectory = ''
@@ -20,29 +21,33 @@ class Client:
     def add_device(self, clientIPAddress):
         if clientIPAddress not in self.devices:
             self.devices[clientIPAddress] = []
-    
+
     # appends a new message to all other client's PCs (except the one which initiated the change)
-    def add_message_to_all(self, currentIP ,message):
+    def add_message_to_all(self, currentIP, message):
         for ip in self.devices:
             if ip != currentIP:
                 self.devices[ip].append(message)
-    
+
     # used if the Client connects from a new PC with a key
     def send_main_directory(self):
+        u.send(len(self.mainDirectory).to_bytes(u.PATH_LEN_SIZE, 'big'))
+        u.send(self.mainDirectory.encode())
         abs_path = os.path.join(self.key, self.mainDirectory)
         u.send_folder(u.my_socket, abs_path, self.mainDirectory)
 
     # sends all the messages relevant to the specified PC, and clears the list afterwards.
-    def send_messages_to(self ,clientIPAddress):
+    def send_messages_to(self, clientIPAddress):
         for message in self.devices[clientIPAddress]:
             message.send_message(self.key)
         self.clear_messages(clientIPAddress)
-    
+
     def clear_messages(self, clientIPAddress):
         self.devices[clientIPAddress].clear()
 
+
 # global clients map. maps ID to Client object
-clients = {} 
+clients = {}
+
 
 # New Client Handeling #
 def generate_key():
@@ -50,9 +55,11 @@ def generate_key():
     key = ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=u.KEY_SIZE))
     return key
 
+
 # creates the main client folder nested under its ID
 def create_main_client_dir(client_key, main_folder):
-    os.makedirs(os.path.join(client_key,main_folder))
+    os.makedirs(os.path.join(client_key, main_folder))
+
 
 def handle_new_client(clientIP, path):
     # print("client has no ID")
@@ -67,6 +74,7 @@ def handle_new_client(clientIP, path):
     client.add_device(clientIP)
     clients[key] = client
 
+
 # Existing Client Handeling #
 
 def handle_existing_client(clientIP, key):
@@ -74,12 +82,14 @@ def handle_existing_client(clientIP, key):
     try:
         client = clients[key]
         client.add_device(clientIP)
+
         client.send_main_directory()
         u.send(u.FIN)
-    except Exception as e: # no such client
+    except Exception as e:  # no such client
         pass
         # print(e)
         # print("no such client")
+
 
 # read the protocol header
 def readHeader():
@@ -89,6 +99,7 @@ def readHeader():
     path = u.my_socket.recv(path_len).decode()
     return key, path_len, data_len, path
 
+
 # start reading commands
 def handle_client(clientIP):
     cmd = u.my_socket.recv(u.COMMAND_SIZE)
@@ -96,35 +107,36 @@ def handle_client(clientIP):
     while cmd != b'':
         key, path_len, data_len, path = readHeader()
         # print(f"got: \t key: {key}\n\t cmd: {cmd} \n\t path: {path}")
-        if cmd == u.EID: # client has an ID
+        if cmd == u.EID:  # client has an ID
             handle_existing_client(clientIP, key)
             return
-        elif cmd == u.NID: # client has no ID
+        elif cmd == u.NID:  # client has no ID
             handle_new_client(clientIP, path)
         else:
             client = None
             try:
                 client = clients[key]
-            except: 
-                return # no such client
+            except:
+                return  # no such client
 
-            if cmd == u.NEWFI: # new file
+            if cmd == u.NEWFI:  # new file
                 u.create_file(u.my_socket, path, data_len, client.key)
-                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-            elif cmd == u.NEWFO: # new folder
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len, path))
+            elif cmd == u.NEWFO:  # new folder
                 u.create_folder(path, client.key)
-                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-            elif cmd == u.DEL: # remove directory
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len, path))
+            elif cmd == u.DEL:  # remove directory
                 abs_path = os.path.join(client.key, path)
                 u.delete_dir(abs_path)
-                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len ,path))
-            elif cmd == u.UPDT: # send updates
+                client.add_message_to_all(clientIP, Message(cmd, path_len, data_len, path))
+            elif cmd == u.UPDT:  # send updates
                 client.send_messages_to(clientIP)
                 u.send(u.FIN)
                 return
             else:
-                pass # invalid cmd 
+                pass  # invalid cmd
         cmd = u.my_socket.recv(u.COMMAND_SIZE)
+
 
 def start_server(port):
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -139,12 +151,14 @@ def start_server(port):
         # print(f"client {clientAddress} dissconnected")
         u.close()
 
+
 def main():
     if len(sys.argv) < 2:
         # print("Not enough args")
         return
     port = int(sys.argv[1])
     start_server(port)
+
 
 if __name__ == "__main__":
     # print("\nServer Active...->")

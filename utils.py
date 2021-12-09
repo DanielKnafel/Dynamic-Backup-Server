@@ -27,17 +27,18 @@ PATH_LEN_SIZE = 4
 FILE_SIZE = 8
 
 # commands
-NEWFO = 0x01.to_bytes(COMMAND_SIZE, 'big')    # new folder
-NEWFI = 0x02.to_bytes(COMMAND_SIZE, 'big')    # new file
-DEL = 0x03.to_bytes(COMMAND_SIZE, 'big')      # delete
-FIN = 0x0F.to_bytes(COMMAND_SIZE, 'big')      # end of communication
-NID = 0x10.to_bytes(COMMAND_SIZE, 'big')      # no id
-EID = 0x11.to_bytes(COMMAND_SIZE, 'big')      # exiting id
-UPDT = 0x12.to_bytes(COMMAND_SIZE, 'big')     # client to server : update ME
+NEWFO = 0x01.to_bytes(COMMAND_SIZE, 'big')  # new folder
+NEWFI = 0x02.to_bytes(COMMAND_SIZE, 'big')  # new file
+DEL = 0x03.to_bytes(COMMAND_SIZE, 'big')  # delete
+FIN = 0x0F.to_bytes(COMMAND_SIZE, 'big')  # end of communication
+NID = 0x10.to_bytes(COMMAND_SIZE, 'big')  # no id
+EID = 0x11.to_bytes(COMMAND_SIZE, 'big')  # exiting id
+UPDT = 0x12.to_bytes(COMMAND_SIZE, 'big')  # client to server : update ME
 MSS = 1e6
 
 my_socket: socket.socket
-connect_info : socket.AddressInfo
+connect_info: socket.AddressInfo
+
 
 class Message:
     cmd = 0x0
@@ -46,16 +47,15 @@ class Message:
     path = ''
     data = ''
 
-    def __init__(self, cmd, path_len, data_len, path, data = ''):
+    def __init__(self, cmd, path_len, data_len, path, data=''):
         self.cmd = cmd
         self.path_len = path_len
         self.data_len = data_len
         self.path = path
         self.data = data
-    
+
     def equals(self, m):
         return (self.cmd == m.cmd) and (self.path == m.path)
-
 
     def send_message(self, clientID):
         abs_path = os.path.join(clientID, self.path)
@@ -67,6 +67,7 @@ class Message:
             header = make_header(DEL, self.path_len, self.data_len, self.path)
             send(header)
 
+
 # **************CREATING & DELETING METHODS************** #
 # for tcp requests
 
@@ -75,11 +76,13 @@ def connect():
     s.connect(connect_info)
     return s
 
+
 def send(data):
     try:
         my_socket.send(data)
     except:
         pass
+
 
 def close():
     try:
@@ -87,7 +90,8 @@ def close():
     except:
         pass
 
-#tested 95%
+
+# tested 95%
 def create_folder(virtual_path, parent_folder):
     absolute_path = os.path.join(parent_folder, virtual_path)
     if not os.path.exists(absolute_path):
@@ -96,7 +100,7 @@ def create_folder(virtual_path, parent_folder):
         time.sleep(0.01)
 
 
-#tested 95%
+# tested 95%
 def create_file(s, virtual_path, data_len, parent_folder):
     data: bytes
     absolute_path = os.path.join(parent_folder, virtual_path)
@@ -110,6 +114,7 @@ def create_file(s, virtual_path, data_len, parent_folder):
             data_remain -= data_read
             time.sleep(0.01)
 
+
 # tested 95%
 def delete_dir(abs_path):
     if os.path.exists(abs_path):
@@ -122,6 +127,7 @@ def delete_dir(abs_path):
     else:
         pass
 
+
 # **************NOTIFY METHODS************** #
 # create protocol header
 def make_header(cmd: bytes,
@@ -131,10 +137,11 @@ def make_header(cmd: bytes,
                 user_id=""):
     message = cmd + \
               user_id.encode() + \
-              path_len.to_bytes(4, 'big') +\
-              data_len.to_bytes(8, 'big') +\
+              path_len.to_bytes(4, 'big') + \
+              data_len.to_bytes(8, 'big') + \
               path.encode()
     return message
+
 
 # use socket s to send file from a given path
 def send_file(s, abs_path, virtual_path, client_id=''):
@@ -149,6 +156,7 @@ def send_file(s, abs_path, virtual_path, client_id=''):
         while file_data != b'':
             s.send(file_data)
             file_data = opened_file.read(int(MSS))
+
 
 # use socket s to send a folder, including its sub-dirs and files
 def send_folder(s, abs_path, virtual_path, client_id=''):
@@ -168,6 +176,7 @@ def send_folder(s, abs_path, virtual_path, client_id=''):
             send_folder(s, os.path.join(abs_path, sub_dir),
                         os.path.join(virtual_path, sub_dir),
                         client_id)
+
 
 # use socket s to send a folder, including its sub-dirs and files
 def send_directory(s, path, main_folder, client_id=''):
