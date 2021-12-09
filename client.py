@@ -36,6 +36,7 @@ def on_created(event):
     else:
         pass
         #print(f"--> Directory not exists: {directory}")
+    request_updates(s, g_parent_folder)
     s.close()
 
 
@@ -50,6 +51,7 @@ def on_deleted(event):
     header = u.make_header(u.DEL, len(virtual_path), dir_size, directory, g_id)
     s = u.connect()
     s.send(header)
+    request_updates(s, g_parent_folder)
     s.close()
 
 
@@ -66,6 +68,7 @@ def on_modified(event):
     if os.path.exists(event.src_path):
         s = u.connect()
         u.send_file(s, directory, virtual_path, g_id)
+        request_updates(s, g_parent_folder)
         s.close()
 
 def on_moved(event):
@@ -90,6 +93,11 @@ def readHeader(s):
     return path_len, data_len, path
 
 # **************MAIN************** #
+def request_updates(s, parent_folder):
+    header = u.make_header(u.UPDT, 0, 0, "", g_id)
+    s.send(header)
+    read_from_buffer(s, parent_folder)
+
 def read_from_buffer(s, parent_folder):
     cmd = s.recv(u.COMMAND_SIZE)
     while cmd != u.FIN:
@@ -125,11 +133,8 @@ def activate(waiting_time, abs_path, parent_folder):
     # print(f"\n-> Watchdog Active(wait={waiting_time})...->")
     while True:
         time.sleep(waiting_time)
-        cmd = u.UPDT
-        header = u.make_header(cmd, 0, 0, "", g_id)
         s = u.connect()
-        s.send(header)
-        read_from_buffer(s, parent_folder)
+        request_updates(s, parent_folder)
         s.close()
 
 
@@ -159,7 +164,7 @@ if __name__ == "__main__":
             g_id = sys.argv[5]
             meet_server = u.make_header(u.EID, len(dir_path), 0, dir_path, user_id=g_id)
             s.send(meet_server)
-            read_from_buffer(g_parent_folder)
+            read_from_buffer(s, g_parent_folder)
         else:
             # print("no key")
             meet_server = u.make_header(u.NID, len(dir_path), 0, dir_path, '0' * u.KEY_SIZE)
